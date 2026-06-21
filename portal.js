@@ -45,6 +45,20 @@
   const WEEK = [38,52,41,67,74,91,83];
   const ASKS = [['"with roast chicken"',31],['"like Ata Rangi but cheaper"',24],['"easy weeknight red"',19],['"a gift under $60"',14]];
   const SALES = { allTime:38940, month:4280, lastMonth:3650, bottles:1240, avg:268, months:[2900,3400,3100,3850,3650,4280], monthLabels:['Jan','Feb','Mar','Apr','May','Jun'] };
+
+  // ---------- plans / activation (demo; Stripe + Supabase flag at go-live) ----------
+  const PLAN_KEY='aiwine-portal:plan';
+  let PLAN; try{ PLAN=JSON.parse(localStorage.getItem(PLAN_KEY))||{}; }catch(e){ PLAN={}; }
+  PLAN=Object.assign({ cellarDoor:false, grow:false, story:'', hours:'', activatedVia:'' }, PLAN);
+  function savePlan(){ try{ localStorage.setItem(PLAN_KEY, JSON.stringify(PLAN)); }catch(e){} }
+  const CODES={ 'FOUNDING49':{price:49,label:'Founding'}, 'WAIRARAPA':{price:0,label:'Wairarapa Association'} };
+  function activate(via, price){ PLAN.cellarDoor=true; PLAN.activatedVia=via; savePlan(); go('plan'); toast(price?('Virtual Cellar Door active \u00b7 $'+price+'/yr'):'Virtual Cellar Door active \u00b7 free'); }
+  function demoCheckout(price, what){
+    if(!confirm('Confirm '+(what==='grow'?'Grow package':'Virtual Cellar Door')+' \u00b7 $'+price+'/yr.\n\nProceed to unlock?')) return;
+    if(what==='grow'){ PLAN.grow=true; savePlan(); go('plan'); toast('Grow unlocked \u00b7 insights & integrations'); }
+    else { activate('subscribed', price); }
+  }
+  function growLock(name){ return `<div class="page-head"><div><div class="eyebrow">Grow</div><h1 class="page-title"><em>${name}</em>.</h1></div></div><div class="card card-pad" style="text-align:center;padding:48px 24px"><div style="font-family:var(--serif);font-size:26px;margin-bottom:8px">${name} is part of <span style="color:var(--claret)">Grow</span></div><div style="font-size:13.5px;color:var(--ink-soft);max-width:440px;margin:0 auto 18px">Unlock scan insights, demand signals and API/EPOS integrations \u2014 $95/yr.</div><button class="btn primary" id="go-plan">See plans</button></div>`; }
   const VARIETIES = Object.keys(TINT);
 
   // ---------- helpers ----------
@@ -66,8 +80,10 @@
     { id:'orders', label:'Orders', icon:'bag', badge:()=>ORDERS.filter(o=>o.status==='new').length },
     { id:'upload', label:'Upload list', icon:'upload' },
     { sec:'Grow' },
+    { id:'plan', label:'Plans & Cellar Door', icon:'passport' },
     { id:'insights', label:'Insights', icon:'chart' },
     { id:'integrations', label:'Integrations', icon:'plug' },
+    { id:'app', label:'Winery app', icon:'sparkle' },
   ];
 
   function shell(){
@@ -87,16 +103,15 @@
               ${n.badge?`<span class="badge" data-badge="${n.id}"></span>`:''}
             </button>`).join('')}
         </nav>
-        <div class="side-foot">Demo data · <a href="../apps/winery/index.html" target="_blank">Open winery app ↗</a><br><span style="opacity:0.6">Live data connects at deploy</span></div>
+        <div class="side-foot"><a href="../apps/winery/index.html" target="_blank">Open winery app ↗</a></div>
       </aside>
       <div class="main">
         <div class="topbar">
           <div style="display:flex;align-items:center;gap:14px">
             <button class="btn-quiet menu-btn" id="menu">${ic('menu',20)}</button>
-            <span class="demo">Demo · sample data</span>
           </div>
           <div class="actions">
-            <button class="btn sm ghost" id="t-app">${ic('passport',15)} Winery app</button>
+            <button class="btn sm ghost" id="t-app">${ic('passport',15)} Open winery app ↗</button>
             <button class="btn sm primary" id="t-add">${ic('plus',15)} Add wine</button>
           </div>
         </div>
@@ -145,7 +160,6 @@
   RENDER.dashboard = el => {
     const lowOut = WINES.filter(w=>stkOf(w)==='low'||stkOf(w)==='out');
     const newOrders = ORDERS.filter(o=>o.status==='new');
-    const totalScans = WINES.reduce((s,w)=>s+w.scans,0);
     const wkRev = ORDERS.reduce((s,o)=>s+(+o.total||0),0);
     const paid = ORDERS.filter(o=>o.status!=='cancelled');
     const totalSales = paid.reduce((s,o)=>s+(+o.total||0),0);
@@ -154,8 +168,8 @@
     const omax = Math.max(1,...paid.map(o=>+o.total||0));
     el.innerHTML = `
       <div class="page-head">
-        <div><div class="eyebrow">Good morning</div><h1 class="page-title">Here's your <em>week</em>.</h1>
-        <div class="sub-line">Everything customers are doing with your wines on AIWine.</div></div>
+        <div><div class="eyebrow">Welcome</div><h1 class="page-title">Your winery on <em>AIWine</em>.</h1>
+        <div class="sub-line">Publish your list to go live — then scans, orders and sommelier activity show up here.</div></div>
         <button class="btn primary" data-go="upload">${ic('upload',15)} Update my list</button>
       </div>
       ${lowOut.length?`<div class="alert ${lowOut.some(w=>stkOf(w)==='out')?'out':'warn'}">
@@ -164,9 +178,9 @@
         <div class="as">${lowOut.map(w=>w.name+' ('+(stkOf(w)==='out'?'out of stock':w.qty+' left')+')').join(' · ')}</div></div>
         <button class="btn sm" data-go="wines">Manage stock</button></div>`:''}
       <div class="grid stat-row" style="margin-bottom:20px">
-        <div class="stat"><div class="k">New orders</div><div class="v">${newOrders.length}</div><div class="d up">${money(newOrders.reduce((s,o)=>s+o.total,0))} to fulfil</div></div>
-        <div class="stat"><div class="k">Scans this week</div><div class="v">${totalScans}</div><div class="d up">↑ 18% vs last week</div></div>
-        <div class="stat"><div class="k">Sommelier picks</div><div class="v">47</div><div class="d">times recommended</div></div>
+        <div class="stat"><div class="k">New orders</div><div class="v">${newOrders.length}</div><div class="d">${newOrders.length?money(newOrders.reduce((s,o)=>s+o.total,0))+' to fulfil':'none yet'}</div></div>
+        <div class="stat"><div class="k">Wines on AIWine</div><div class="v">${WINES.length}</div><div class="d">in your range</div></div>
+        <div class="stat"><div class="k">Orders · all time</div><div class="v">${paid.length}</div><div class="d">${shippedN} shipped</div></div>
         <div class="stat"><div class="k">Revenue · 30 days</div><div class="v" style="font-size:30px">${money(wkRev)}</div><div class="d">direct to you</div></div>
       </div>
       <div class="card card-pad" style="margin-bottom:20px">
@@ -188,9 +202,11 @@
       </div>
       <div class="two">
         <div class="card">
-          <div class="card-head"><span class="card-title">Live activity</span><span class="label">Real-time</span></div>
-          <div class="card-pad" style="padding-top:4px;padding-bottom:6px">
-            ${FEED.map(f=>`<div class="row-item"><span class="row-ic">${ic(f.ic,16)}</span><div class="row-bd"><div class="t">${f.t}</div><div class="when">${f.when} ago</div></div></div>`).join('')}
+          <div class="card-head"><span class="card-title">Activity</span><span class="label">Live</span></div>
+          <div class="card-pad" style="padding-top:4px">
+            <div style="display:grid;place-items:center;text-align:center;color:var(--muted);font-size:13px;padding:30px 16px;border:1px dashed var(--line);border-radius:8px">
+              When customers scan, wishlist or buy your wines, it’ll stream in here.
+            </div>
           </div>
         </div>
         <div style="display:flex;flex-direction:column;gap:20px">
@@ -201,8 +217,9 @@
             </div>
           </div>
           <div class="card card-pad">
-            <div class="label" style="margin-bottom:14px">Where your wine travels</div>
-            ${REGIONS.slice(0,5).map(([r,v])=>`<div class="bar-row"><span class="bl">${r}</span><div class="bar-track"><div class="bar-fill" style="width:${Math.round(v/186*100)}%"></div></div><span class="bv">${v}</span></div>`).join('')}
+            <div class="label" style="margin-bottom:10px">Set up your storefront</div>
+            <div style="font-size:13px;color:var(--ink-soft);line-height:1.55;margin-bottom:14px">Upload your wine list and set prices &amp; stock, and your range goes live across AIWine.</div>
+            <button class="btn primary" data-go="upload">${ic('upload',15)} Upload my list</button>
           </div>
         </div>
       </div>`;
@@ -276,26 +293,30 @@
   RENDER.upload = el => {
     el.innerHTML = `
       <div class="page-head"><div><div class="eyebrow">Bulk update</div><h1 class="page-title">Upload your <em>list</em>.</h1>
-      <div class="sub-line">A spreadsheet of your range — we'll match it to your wines and you confirm before anything changes.</div></div></div>
+      <div class="sub-line">The smoothest way is our ready-made template — it has every field (incl. tasting notes &amp; colour) with dropdowns, so your wines map first time. Download it, fill it in, drop it back.</div></div></div>
       <div class="two">
         <div>
           <div class="drop" id="drop">
             <div class="dic">${ic('upload',26)}</div>
-            <h3>Drop your CSV or Excel here</h3>
-            <p>Or choose a file. We read columns like wine name, vintage, price and stock — in any order.</p>
+            <h3>Drop your filled-in template here</h3>
+            <p>CSV or Excel. Using our template means every column maps automatically and nothing is missed — no guesswork.</p>
             <button class="btn primary" id="pick">${ic('upload',15)} Choose a file</button>
             <input type="file" id="file" accept=".csv,.xlsx,.xls" hidden>
           </div>
           <div id="preview" style="margin-top:18px"></div>
         </div>
         <div class="card card-pad">
-          <div class="label" style="margin-bottom:12px">Tips</div>
+          <div class="label" style="margin-bottom:8px">Start here</div>
+          <div style="font-size:13px;color:var(--ink-soft);line-height:1.55;margin-bottom:14px">Download our wine template first — it's the easiest, most reliable way to get your full range online, with built-in dropdowns and the right columns.</div>
+          <button class="btn primary" id="tmpl" style="width:100%;justify-content:center;margin-bottom:18px">${ic('download',15)} Download the wine template</button>
+          <div class="label" style="margin-bottom:12px">Good to know</div>
           <div style="display:flex;flex-direction:column;gap:13px;font-size:13px;color:var(--ink-soft);line-height:1.55">
-            <div>${ic('check',14,'var(--green)')} One row per wine. A header row helps us map columns automatically.</div>
-            <div>${ic('check',14,'var(--green)')} Update the <b>stock</b> column and we'll grey out anything that hits zero.</div>
+            <div>${ic('check',14,'var(--green)')} Dropdowns keep variety, colour &amp; region spelt consistently.</div>
+            <div>${ic('check',14,'var(--green)')} One row per wine — delete the grey example rows (they're skipped anyway).</div>
+            <div>${ic('check',14,'var(--green)')} Tasting notes are kept to ~25 words so cards stay tidy.</div>
             <div>${ic('check',14,'var(--green)')} Nothing changes until you review the preview and confirm.</div>
           </div>
-          <button class="btn" id="tmpl" style="margin-top:18px;width:100%;justify-content:center">${ic('download',15)} Download a template</button>
+          <div style="font-size:11.5px;color:var(--muted);margin-top:14px">Own spreadsheet? We'll still try to match it — but the template is far more reliable.</div>
         </div>
       </div>`;
     const drop=el.querySelector('#drop'), file=el.querySelector('#file');
@@ -319,16 +340,32 @@
       const cells=lines.map(l=>l.split(',').map(c=>c.trim().replace(/^"|"$/g,'')));
       const head=cells[0].map(h=>h.toLowerCase());
       const find=keys=>head.findIndex(h=>keys.some(k=>h.includes(k)));
-      const ci={ name:find(['name','wine']), variety:find(['variet','grape','type']), vintage:find(['vintage','year']), price:find(['price','rrp','cost']), stock:find(['stock','qty','quantity','cellar']) };
-      const body=cells.slice(1);
-      const rows=body.map(c=>({ name:ci.name>=0?c[ci.name]:'', variety:ci.variety>=0?c[ci.variety]:'', vintage:ci.vintage>=0?c[ci.vintage]:'', price:ci.price>=0?c[ci.price]:'', stock:ci.stock>=0?c[ci.stock]:'' }));
+      const ci={ name:find(['wine name','name','wine']), variety:find(['variet','grape']), colour:find(['colour','color','type']), vintage:find(['vintage','year']), price:find(['price','rrp','cost']), stock:find(['stock','qty','quantity','cellar']), notes:find(['tasting','notes','descrip']), pairings:find(['pairing','food','match']), style:find(['style','body']), organic:find(['organic']), awards:find(['award','medal']), region:find(['region']), sub:find(['sub-region','subregion','sub region']) };
+      // canonical lists — snap dropdown fields to correct spelling/case on import
+      const L_VAR=['Sparkling','Sauvignon Blanc','Riesling','Pinot Gris','Gewürztraminer','Albariño','Viognier','Chardonnay','Chenin Blanc','Semillon','White Blend','Rosé','Pinot Noir','Syrah','Merlot','Cabernet Sauvignon','Malbec','Tempranillo','Red Blend','Dessert','Fortified','Other'];
+      const L_COL=['Red','White','Rosé','Sparkling','Dessert','Fortified'];
+      const L_STY=['light','medium-bodied','full-bodied'];
+      const L_REG=['Northland','Auckland','Waikato & Bay of Plenty','Gisborne','Hawke’s Bay','Wairarapa','Nelson','Marlborough','North Canterbury','Waitaki Valley','Central Otago','Other'];
+      const snap=(v,list)=>{ if(!v)return ''; const t=String(v).trim().toLowerCase(); return list.find(x=>x.toLowerCase()===t)||String(v).trim(); };
+      const at=(c,i)=>i>=0?(c[i]||'').trim():'';
+      const trim25=t=>{ t=String(t||'').trim(); const w=t.split(/\s+/).filter(Boolean); let s=w.length>25?w.slice(0,25).join(' '):t; if(s.length>160)s=s.slice(0,160).replace(/\s+\S*$/,''); return {text:s, cut:(w.length>25||t.length>160)}; };
+      const isExample=n=>/^example\b/i.test(n)||/delete this row/i.test(n);
+      let skipped=0, trimmedN=0;
+      const rows=cells.slice(1).map(c=>{
+        const name=at(c,ci.name);
+        if(!name){ return null; }
+        if(isExample(name)){ skipped++; return null; }
+        const tn=trim25(at(c,ci.notes)); if(tn.cut)trimmedN++;
+        const pair=at(c,ci.pairings).split(';').map(s=>s.trim()).filter(Boolean).slice(0,3);
+        return { name, variety:snap(at(c,ci.variety),L_VAR), colour:snap(at(c,ci.colour),L_COL), vintage:at(c,ci.vintage), price:at(c,ci.price), stock:at(c,ci.stock), notes:tn.text, pairings:pair, style:snap(at(c,ci.style),L_STY), organic:/^y/i.test(at(c,ci.organic)), awards:at(c,ci.awards), region:snap(at(c,ci.region),L_REG), sub:at(c,ci.sub) };
+      }).filter(Boolean);
       const matched=rows.filter(x=>WINES.some(w=>w.name.toLowerCase()===String(x.name).toLowerCase())).length;
       prev.innerHTML=`<div class="card">
-        <div class="card-head"><span class="card-title">Preview · ${rows.length} rows</span><span class="label">${matched} match existing · ${rows.length-matched} new</span></div>
+        <div class="card-head"><span class="card-title">Preview · ${rows.length} wines</span><span class="label">${matched} update · ${rows.length-matched} new${skipped?' · '+skipped+' example skipped':''}</span></div>
         <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Wine</th><th>Variety</th><th>Vintage</th><th>Price</th><th>Stock</th><th></th></tr></thead>
         <tbody>${rows.slice(0,12).map(x=>{ const isNew=!WINES.some(w=>w.name.toLowerCase()===String(x.name).toLowerCase()); return `<tr><td style="font-weight:600">${esc(x.name)||'<span style="color:var(--red)">missing</span>'}</td><td>${esc(x.variety)}</td><td class="mono" style="font-size:12px">${esc(x.vintage)}</td><td class="mono" style="font-size:12px">${x.price?'$'+esc(x.price):''}</td><td class="mono" style="font-size:12px">${esc(x.stock)}</td><td>${isNew?'<span class="pill new">New</span>':'<span class="pill in">Update</span>'}</td></tr>`; }).join('')}</tbody></table></div>
         <div class="card-pad" style="display:flex;justify-content:space-between;align-items:center;border-top:1px solid var(--line-soft)">
-          <span style="font-size:12.5px;color:var(--muted)">${rows.length>12?'+ '+(rows.length-12)+' more rows':'All rows shown'}</span>
+          <span style="font-size:12.5px;color:var(--muted)">${rows.length>12?'+ '+(rows.length-12)+' more':'All rows shown'}${trimmedN?' · '+trimmedN+' note'+(trimmedN>1?'s':'')+' shortened to 25 words':''}</span>
           <button class="btn primary" id="confirm">${ic('check',15)} Confirm &amp; publish ${rows.length} wines</button>
         </div></div>`;
       prev.querySelector('#confirm').addEventListener('click',()=>{ toast('Published · '+rows.length+' wines synced to AIWine 🍷'); prev.innerHTML='<div class="card card-pad" style="text-align:center"><div style="color:var(--green);margin-bottom:6px">'+ic('check',26,'var(--green)')+'</div><div style="font-weight:700">Your range is live</div><div style="font-size:13px;color:var(--ink-soft);margin-top:4px">Customers see the changes now. (Demo — no data was written.)</div></div>'; });
@@ -336,11 +373,79 @@
     r.readAsText(f);
   }
 
+  RENDER.plan = el => {
+    const active = PLAN.cellarDoor;
+    const gate = `
+      <div class="card card-pad">
+        <div class="label" style="color:var(--brass);margin-bottom:8px">Virtual Cellar Door \u00b7 $95/yr</div>
+        <div style="font-family:var(--serif);font-size:24px;margin-bottom:6px">Activate your virtual cellar door</div>
+        <div style="font-size:13.5px;color:var(--ink-soft);max-width:560px;margin-bottom:18px">A rich profile \u2014 hero photo, your story, visit details and a \u201cCellar Door\u201d badge across AIWine. Self-managed, right here.</div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px">
+          <button class="btn primary" data-pay="95">Subscribe \u00b7 $95/yr</button>
+          <button class="btn" data-pay="49">Founding rate \u00b7 $49 first year</button>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;max-width:400px">
+          <input id="code" placeholder="Have an activation code?" style="flex:1;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:var(--card-2);font-size:14px">
+          <button class="btn" id="act-code">Apply</button>
+        </div>
+      </div>`;
+    const editor = `
+      <div class="card">
+        <div class="card-head"><span class="card-title">Your cellar door</span><span class="pill in">Active \u00b7 ${esc(PLAN.activatedVia||'subscribed')}</span></div>
+        <div class="card-pad" style="display:flex;flex-direction:column;gap:14px">
+          <div class="field"><label>Your story</label><textarea id="cd-story" rows="4" style="width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:var(--card-2);font-family:var(--sans);font-size:14px;resize:vertical" placeholder="Tell visitors who you are\u2026">${esc(PLAN.story||'')}</textarea></div>
+          <div class="field"><label>Visit / tasting hours</label><input id="cd-hours" value="${esc(PLAN.hours||'')}" placeholder="Fri\u2013Sun \u00b7 11am\u20134pm" style="width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:var(--card-2);font-size:14px"></div>
+          <div class="field"><label>Hero photo</label><div style="border:2px dashed var(--line);border-radius:8px;padding:22px;text-align:center;color:var(--muted);font-size:13px">Drag a photo here (demo) \u2014 shown on your public profile</div></div>
+          <div style="display:flex;justify-content:flex-end"><button class="btn primary" id="cd-save">Save \u2014 publish to my profile</button></div>
+        </div>
+      </div>`;
+    el.innerHTML = `
+      <div class="page-head"><div><div class="eyebrow">Your plan</div><h1 class="page-title">Plans &amp; <em>cellar door</em>.</h1>
+      <div class="sub-line">Free portal &amp; wine uploads for everyone. Upgrade for a virtual cellar door and growth tools.</div></div></div>
+      ${active ? editor : gate}
+      <div class="card card-pad" style="margin-top:20px;display:flex;align-items:center;gap:18px;flex-wrap:wrap">
+        <div style="flex:1;min-width:240px"><div class="card-title" style="margin-bottom:4px">Grow \u2014 insights &amp; integrations</div>
+        <div style="font-size:13px;color:var(--ink-soft)">Scan insights, demand signals and API/EPOS sync. <b>$95/yr.</b></div></div>
+        ${PLAN.grow?'<span class="pill in">Active</span>':'<button class="btn primary" id="grow-buy">Unlock Grow \u00b7 $95/yr</button>'}
+      </div>`;
+    if(!active){
+      el.querySelector('#act-code').addEventListener('click',()=>{ const c=(el.querySelector('#code').value||'').trim().toUpperCase(); const hit=CODES[c]; if(!hit){ toast('That code isn\u2019t valid'); return; } activate(hit.label, hit.price); });
+      el.querySelectorAll('[data-pay]').forEach(b=>b.addEventListener('click',()=>demoCheckout(+b.dataset.pay)));
+    } else {
+      el.querySelector('#cd-save').addEventListener('click',()=>{ PLAN.story=el.querySelector('#cd-story').value; PLAN.hours=el.querySelector('#cd-hours').value; savePlan(); toast('Cellar door updated \u00b7 live on your profile'); });
+    }
+    const gb=el.querySelector('#grow-buy'); if(gb) gb.addEventListener('click',()=>demoCheckout(95,'grow'));
+  };
+
+  RENDER.app = el => {
+    const on = PLAN.grow;
+    el.innerHTML = `
+      <div class="page-head"><div><div class="eyebrow">In your pocket</div><h1 class="page-title">Winery <em>app</em>.</h1>
+      <div class="sub-line">Manage stock and watch live scans from your phone — same login, same data.</div></div></div>
+      ${on ? `
+        <div class="card card-pad" style="display:flex;align-items:center;gap:18px;flex-wrap:wrap">
+          <div style="flex:1;min-width:240px"><div class="card-title" style="margin-bottom:4px">Your winery app is unlocked <span class="pill in">Grow</span></div>
+          <div style="font-size:13px;color:var(--ink-soft)">Install it on your phone — live scans, stock from the tractor, and regional &amp; national insights.</div></div>
+          <button class="btn primary" id="app-open">${ic('sparkle',15)} Download the winery app</button>
+        </div>
+        <div class="card card-pad" style="margin-top:16px">
+          <div class="label" style="margin-bottom:10px">How to install</div>
+          <div style="font-size:13.5px;color:var(--ink-soft);line-height:1.6">Open the link on your phone, then choose <b>Add to Home Screen</b> — it installs like a normal app, icon and all. Same login as this portal.</div>
+        </div>` : `
+        <div class="card card-pad" style="text-align:center;padding:48px 24px">
+          <div style="font-family:var(--serif);font-size:26px;margin-bottom:8px">The winery app is part of <span style="color:var(--claret)">Grow</span></div>
+          <div style="font-size:13.5px;color:var(--ink-soft);max-width:480px;margin:0 auto 18px">Grow ($95/yr) unlocks the winery app — live scans and stock on your phone, plus regional &amp; national insights. Your own data stays free here in the portal.</div>
+          <button class="btn primary" id="app-grow">See plans</button>
+        </div>`}`;
+    const o=el.querySelector('#app-open'); if(o) o.addEventListener('click',()=>window.open('../apps/winery/index.html','_blank'));
+    const g=el.querySelector('#app-grow'); if(g) g.addEventListener('click',()=>go('plan'));
+  };
+
   RENDER.insights = el => {
+    const scope = el._scope || 'local';
     const max=Math.max(...WEEK);
-    el.innerHTML=`
-      <div class="page-head"><div><div class="eyebrow">Demand signals</div><h1 class="page-title"><em>Insights</em>.</h1>
-      <div class="sub-line">What customers ask the Sommelier, and how it sends them to you.</div></div></div>
+    const tabs = `<div class="seg">${[['local','Your winery'],['regional','Wairarapa region'],['national','New Zealand']].map(([k,l])=>`<button data-scope="${k}" class="${scope===k?'on':''}">${l}</button>`).join('')}</div>`;
+    const local = `
       <div class="two">
         <div class="card card-pad">
           <div class="label" style="margin-bottom:14px">Scans · last 7 days</div>
@@ -356,9 +461,23 @@
         <div class="label" style="margin-bottom:14px">Most-scanned wines</div>
         ${[...WINES].sort((a,b)=>b.scans-a.scans).slice(0,5).map(w=>`<div class="bar-row"><span class="bl" style="width:200px;display:flex;align-items:center;gap:9px">${bottleEl(w)}${esc(w.name)}</span><div class="bar-track"><div class="bar-fill" style="width:${Math.round(w.scans/214*100)}%"></div></div><span class="bv">${w.scans}</span></div>`).join('')}
       </div>`;
+    function aggCard(title, rows, note){ const mx=rows[0][1]; return `
+      <div class="card card-pad"><div class="label" style="margin-bottom:14px">${title}</div>
+      ${rows.map(([n,v])=>`<div class="bar-row"><span class="bl" style="width:160px">${n}</span><div class="bar-track"><div class="bar-fill" style="width:${Math.round(v/mx*100)}%"></div></div><span class="bv">${v}%</span></div>`).join('')}
+      <div style="font-size:11.5px;color:var(--muted);margin-top:12px">${note}</div></div>`; }
+    const locked = (label,desc)=>`<div class="card card-pad" style="text-align:center;padding:48px 24px"><div style="font-family:var(--serif);font-size:26px;margin-bottom:8px">${label} insights are part of <span style="color:var(--claret)">Grow</span></div><div style="font-size:13.5px;color:var(--ink-soft);max-width:470px;margin:0 auto 18px">Your own data is always free. A Grow subscription ($95/yr) adds ${desc} — aggregated across wineries and anonymised.</div><button class="btn primary" id="go-plan">See plans</button></div>`;
+    let body;
+    if(scope==='local') body=local;
+    else if(!PLAN.grow) body=locked(scope==='regional'?'Regional':'National', scope==='regional'?'how your whole region is trending':'the national picture');
+    else if(scope==='regional') body=`<div class="two">${aggCard('Most-asked varieties · Wairarapa', [['Pinot Noir',38],['Chardonnay',22],['Sauvignon Blanc',16],['Syrah',12],['Rosé',8]], 'Aggregated across 40+ Wairarapa wineries on AIWine. Anonymised.')}${aggCard('Demand vs last quarter', [['Pinot Noir',12],['Rosé',9],['Chardonnay',5],['Syrah',3],['Sauvignon Blanc',2]], 'Change in Sommelier asks across the region.')}</div>`;
+    else body=`<div class="two">${aggCard('Most-asked varieties · New Zealand', [['Sauvignon Blanc',41],['Pinot Noir',24],['Chardonnay',14],['Pinot Gris',9],['Rosé',7]], 'Aggregated across every region on AIWine. Anonymised.')}${aggCard('Rising nationally · last 90 days', [['Albariño',31],['Chenin Blanc',22],['Syrah',14],['Rosé',11],['Pinot Gris',6]], 'Fastest-growing Sommelier asks, nationwide.')}</div>`;
+    el.innerHTML = `<div class="page-head"><div><div class="eyebrow">Demand signals</div><h1 class="page-title"><em>Insights</em>.</h1><div class="sub-line">Your own data is free. Grow adds the regional &amp; national picture.</div></div>${tabs}</div>${body}`;
+    el.querySelectorAll('[data-scope]').forEach(b=>b.addEventListener('click',()=>{ el._scope=b.dataset.scope; RENDER.insights(el); }));
+    const gp=el.querySelector('#go-plan'); if(gp) gp.addEventListener('click',()=>go('plan'));
   };
 
   RENDER.integrations = el => {
+    if(!PLAN.grow){ el.innerHTML=growLock('Integrations'); el.querySelector('#go-plan').addEventListener('click',()=>go('plan')); return; }
     el.innerHTML=`
       <div class="page-head"><div><div class="eyebrow">Connect</div><h1 class="page-title"><em>Integrations</em>.</h1>
       <div class="sub-line">Three ways to keep your range in sync — pick what suits how you work.</div></div></div>
@@ -390,20 +509,34 @@
       <div class="modal-body">
         <div class="field"><label>Wine name</label><input id="f-name" placeholder="e.g. Crimson Pinot Noir" autofocus></div>
         <div class="grid-2">
-          <div class="field"><label>Variety</label><select id="f-var">${VARIETIES.map(v=>`<option>${v}</option>`).join('')}</select></div>
-          <div class="field"><label>Vintage</label><input id="f-vin" type="number" value="2024"></div>
+          <div class="field"><label>Variety</label><select id="f-var">${VARIETIES.map(v=>`<option>${v}</option>`).join('')}<option>Other</option></select></div>
+          <div class="field"><label>Colour / type</label><select id="f-colour"><option>Red</option><option>White</option><option>Rosé</option><option>Sparkling</option><option>Dessert</option><option>Fortified</option></select></div>
         </div>
         <div class="grid-2">
+          <div class="field"><label>Vintage</label><input id="f-vin" type="number" value="2024"></div>
           <div class="field"><label>Price (incl GST)</label><input id="f-price" type="number" placeholder="0"></div>
-          <div class="field"><label>Bottles in cellar</label><input id="f-qty" type="number" value="0"></div>
         </div>
+        <div class="field"><label>Bottles in cellar</label><input id="f-qty" type="number" value="0"></div>
+        <div class="grid-2">
+          <div class="field"><label>Style</label><select id="f-style"><option value="">—</option><option>light</option><option>medium-bodied</option><option>full-bodied</option></select></div>
+          <div class="field"><label>Organic</label><select id="f-organic"><option>N</option><option>Y</option></select></div>
+        </div>
+        <div class="grid-2">
+          <div class="field"><label>Region</label><select id="f-region"><option value="">—</option><option>Northland</option><option>Auckland</option><option>Waikato & Bay of Plenty</option><option>Gisborne</option><option>Hawke’s Bay</option><option>Wairarapa</option><option>Nelson</option><option>Marlborough</option><option>North Canterbury</option><option>Waitaki Valley</option><option>Central Otago</option><option>Other</option></select></div>
+          <div class="field"><label>Sub-region</label><input id="f-sub" placeholder="e.g. Martinborough"></div>
+        </div>
+        <div class="field"><label>Tasting notes <span style="color:var(--muted);font-weight:400">(max 25 words)</span></label><textarea id="f-notes" rows="2" style="width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:var(--card-2);font-family:var(--sans);font-size:14px;color:var(--ink);resize:vertical" placeholder="Cherry, plum and soft spice…"></textarea></div>
+        <div class="field"><label>Food pairings <span style="color:var(--muted);font-weight:400">(up to 3, semicolon ;)</span></label><input id="f-pair" placeholder="roast duck; salmon; mushroom risotto"></div>
+        <div class="field"><label>Awards <span style="color:var(--muted);font-weight:400">(semicolon ;)</span></label><input id="f-awards" placeholder="Gold · NZ IWS 2025"></div>
       </div>
       <div class="modal-foot"><button class="btn" id="m-cancel">Cancel</button><button class="btn primary" id="m-save">${ic('plus',15)} Add to my range</button></div>`;
     openModal();
     $('#m-x').onclick=closeModal; $('#m-cancel').onclick=closeModal;
     $('#m-save').onclick=()=>{
       const name=$('#f-name').value.trim(); if(!name){ toast('Give the wine a name'); return; }
-      const w={ id:Date.now(), name, variety:$('#f-var').value, vintage:+$('#f-vin').value||2024, price:+$('#f-price').value||0, qty:+$('#f-qty').value||0, scans:0 };
+      const pairs=($('#f-pair').value||'').split(';').map(s=>s.trim()).filter(Boolean).slice(0,3);
+      const notes=($('#f-notes').value||'').trim().split(/\s+/).filter(Boolean).slice(0,25).join(' ');
+      const w={ id:Date.now(), name, variety:$('#f-var').value, colour:$('#f-colour').value, style:$('#f-style').value, organic:$('#f-organic').value==='Y', region:$('#f-region').value, subRegion:$('#f-sub').value.trim(), notes, pairings:pairs, awards:($('#f-awards').value||'').trim(), vintage:+$('#f-vin').value||2024, price:+$('#f-price').value||0, qty:+$('#f-qty').value||0, scans:0 };
       PStore.addWine(w); closeModal(); go('wines'); toast('Added · '+name+' is live on AIWine 🍷');
     };
   }
@@ -421,6 +554,7 @@
           <div class="field" style="margin-bottom:14px"><label>Password</label><input id="lp" type="password"></div>
           ${err?`<div style="color:var(--red);font-size:12.5px;margin-bottom:12px">${esc(err)}</div>`:''}
           <button class="btn primary" type="submit" style="width:100%;justify-content:center">Sign in</button>
+          <button type="button" id="lf-forgot" style="display:block;width:100%;text-align:center;margin-top:14px;background:none;border:none;color:var(--brass);font-size:12.5px;cursor:pointer;text-decoration:underline;text-underline-offset:3px">Forgot password?</button>
         </form>
         <div id="toast"></div>
       </div>`;
@@ -429,11 +563,57 @@
       try { await PStore.signIn(document.getElementById('le').value.trim(), document.getElementById('lp').value); boot(); }
       catch(ex){ renderLogin(ex.message); }
     });
+    document.getElementById('lf-forgot').addEventListener('click', ()=>renderReset());
+  }
+
+  function authWrap(inner){
+    return `<div style="grid-column:1/-1;min-height:100vh;display:grid;place-items:center;background:linear-gradient(180deg,#241B15,var(--ink))">${inner}<div id="toast"></div></div>`;
+  }
+  function renderReset(){
+    document.getElementById('app').innerHTML = authWrap(`
+      <form id="rf" style="width:min(360px,90vw);background:var(--card);border:1px solid var(--line);border-radius:14px;padding:30px 28px;box-shadow:0 30px 80px rgba(0,0,0,.4)">
+        <div class="wordmark" style="color:var(--ink);font-size:20px;margin-bottom:4px">AI<span class="dot" style="background:var(--claret)"></span>Wine<span class="sfx" style="color:var(--brass)">Partner</span></div>
+        <div style="font-family:var(--serif);font-size:24px;font-weight:600;margin:10px 0 8px">Reset password</div>
+        <div style="font-size:13px;color:var(--ink-soft);line-height:1.5;margin-bottom:16px">Enter your winery login email and we’ll send a link to set a new password.</div>
+        <div class="field" style="margin-bottom:12px"><label>Email</label><input id="re" type="email" autofocus></div>
+        <div id="rmsg" style="font-size:12.5px;line-height:1.5;margin-bottom:12px"></div>
+        <button class="btn primary" type="submit" style="width:100%;justify-content:center">Send reset link</button>
+        <button type="button" id="rback" style="display:block;width:100%;text-align:center;margin-top:14px;background:none;border:none;color:var(--brass);font-size:12.5px;cursor:pointer;text-decoration:underline;text-underline-offset:3px">Back to sign in</button>
+      </form>`);
+    document.getElementById('rback').addEventListener('click', ()=>renderLogin());
+    document.getElementById('rf').addEventListener('submit', async e=>{
+      e.preventDefault();
+      const btn=e.target.querySelector('button[type=submit]'); const msgEl=document.getElementById('rmsg');
+      try {
+        btn.disabled=true; btn.textContent='Sending…';
+        await PStore.resetPassword(document.getElementById('re').value);
+        msgEl.style.color='#3F6B4B'; msgEl.textContent='Check your inbox — if an account exists for that email, we’ve sent a reset link.';
+        document.getElementById('re').closest('.field').style.display='none'; btn.style.display='none';
+      } catch(ex){ msgEl.style.color='var(--red)'; msgEl.textContent=ex.message; btn.disabled=false; btn.textContent='Send reset link'; }
+    });
+  }
+  function renderRecovery(){
+    document.getElementById('app').innerHTML = authWrap(`
+      <form id="cf" style="width:min(360px,90vw);background:var(--card);border:1px solid var(--line);border-radius:14px;padding:30px 28px;box-shadow:0 30px 80px rgba(0,0,0,.4)">
+        <div class="wordmark" style="color:var(--ink);font-size:20px;margin-bottom:4px">AI<span class="dot" style="background:var(--claret)"></span>Wine<span class="sfx" style="color:var(--brass)">Partner</span></div>
+        <div style="font-family:var(--serif);font-size:24px;font-weight:600;margin:10px 0 8px">Set a new password</div>
+        <div style="font-size:13px;color:var(--ink-soft);line-height:1.5;margin-bottom:16px">Choose a new password for your winery login.</div>
+        <div class="field" style="margin-bottom:12px"><label>New password</label><input id="np" type="password" autofocus></div>
+        <div id="cmsg" style="color:var(--red);font-size:12.5px;margin-bottom:12px"></div>
+        <button class="btn primary" type="submit" style="width:100%;justify-content:center">Save new password</button>
+      </form>`);
+    document.getElementById('cf').addEventListener('submit', async e=>{
+      e.preventDefault();
+      const btn=e.target.querySelector('button[type=submit]'); const msgEl=document.getElementById('cmsg');
+      try { btn.disabled=true; btn.textContent='Saving…'; await PStore.updatePassword(document.getElementById('np').value); try{history.replaceState(null,'',location.pathname);}catch(e2){} boot(); }
+      catch(ex){ msgEl.textContent=ex.message; btn.disabled=false; btn.textContent='Save new password'; }
+    });
   }
 
   // ---------- boot ----------
   async function boot(){
     let r; try { r = await PStore.init(); } catch(e){ r = { ok:false, error:e.message }; }
+    if (/type=recovery/.test(location.hash || '')) { renderRecovery(); return; }   // arrived from a reset email
     if (r && r.needsAuth) { renderLogin(); return; }
     WINES = PStore.wines; ORDERS = PStore.orders;
     shell();

@@ -10,20 +10,14 @@
 
   // ---------- demo seed (Ata Rangi, Martinborough) ----------
   const DEMO_WINES = [
-    { id:'w1', name:'Crimson Pinot Noir', variety:'Pinot Noir', vintage:2023, price:32, qty:60, scans:214 },
-    { id:'w2', name:'Ata Rangi Pinot Noir', variety:'Pinot Noir', vintage:2022, price:99, qty:30, scans:188 },
-    { id:'w3', name:'Craighall Chardonnay', variety:'Chardonnay', vintage:2022, price:55, qty:6, scans:122 },
-    { id:'w4', name:'Te Wā Sauvignon Blanc', variety:'Sauvignon Blanc', vintage:2024, price:38, qty:28, scans:71 },
-    { id:'w5', name:'Summer Rosé', variety:'Rosé', vintage:2024, price:28, qty:5, scans:96 },
-    { id:'w6', name:'Kahu Botrytis Riesling', variety:'Riesling', vintage:2021, price:42, qty:0, scans:34 },
+    { id:'w1', name:'Crimson Pinot Noir', variety:'Pinot Noir', vintage:2023, price:32, qty:60, scans:0 },
+    { id:'w2', name:'Ata Rangi Pinot Noir', variety:'Pinot Noir', vintage:2022, price:99, qty:30, scans:0 },
+    { id:'w3', name:'Craighall Chardonnay', variety:'Chardonnay', vintage:2022, price:55, qty:6, scans:0 },
+    { id:'w4', name:'Te Wā Sauvignon Blanc', variety:'Sauvignon Blanc', vintage:2024, price:38, qty:28, scans:0 },
+    { id:'w5', name:'Summer Rosé', variety:'Rosé', vintage:2024, price:28, qty:5, scans:0 },
+    { id:'w6', name:'Kahu Botrytis Riesling', variety:'Riesling', vintage:2021, price:42, qty:0, scans:0 },
   ];
-  const DEMO_ORDERS = [
-    { id:'AW-2041', placedAt:'25 min ago', destination:'Auckland', items:'6 × Crimson Pinot Noir', total:204, status:'new' },
-    { id:'AW-2038', placedAt:'2 hours ago', destination:'Wellington', items:'3 × Ata Rangi Pinot · 2 × Te Wā', total:373, status:'new' },
-    { id:'AW-2034', placedAt:'Yesterday', destination:'Christchurch', items:'12 × Crimson Pinot Noir', total:346, status:'packing' },
-    { id:'AW-2029', placedAt:'2 days ago', destination:'Hamilton', items:'6 × Summer Rosé', total:163, status:'shipped' },
-    { id:'AW-2021', placedAt:'4 days ago', destination:'Nelson', items:'4 × Craighall Chardonnay', total:220, status:'shipped' },
-  ];
+  const DEMO_ORDERS = [];
 
   let sb = null, session = null, wineryId = null, wineryName = 'Ata Rangi', wineryRegion = 'Martinborough';
   const Store = {
@@ -58,6 +52,22 @@
     },
     async signOut() { if (sb) await sb.auth.signOut(); session = null; },
 
+    async resetPassword(email) {
+      if (!LIVE) throw new Error('Password reset is available on the live portal.');
+      const e = (email || '').trim().toLowerCase();
+      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e)) throw new Error('Enter the email for your winery login.');
+      const { error } = await sb.auth.resetPasswordForEmail(e, { redirectTo: location.origin + location.pathname });
+      if (error) throw new Error(error.message);
+      return true;
+    },
+    async updatePassword(pw) {
+      if (!LIVE) throw new Error('Password reset is available on the live portal.');
+      if (!pw || pw.length < 6) throw new Error('Password must be at least 6 characters.');
+      const { error } = await sb.auth.updateUser({ password: pw });
+      if (error) throw new Error(error.message);
+      return true;
+    },
+
     async reload() {
       if (!LIVE) return;
       const [w, o] = await Promise.all([
@@ -71,12 +81,23 @@
     // ---- mutations (write-through) ----
     async updateWine(id, patch) {
       const w = Store.wines.find(x => x.id === id); if (w) Object.assign(w, patch);
-      if (LIVE) await sb.from('wines').update(patch).eq('id', id);
+      if (LIVE) {
+        const db = Object.assign({}, patch);
+        if (db.qty !== undefined) { db.stock = db.qty; delete db.qty; } // table column is `stock`
+        await sb.from('wines').update(db).eq('id', id);
+      }
     },
     async addWine(w) {
       Store.wines.unshift(w);
       if (LIVE) {
-        const row = { name: w.name, variety: w.variety, vintage: w.vintage, price: w.price, qty: w.qty, wineryId };
+        const row = {
+          name: w.name, variety: w.variety, colour: w.colour || null, style: w.style || null,
+          vintage: w.vintage, price: w.price, stock: w.qty, organic: !!w.organic,
+          notes: w.notes || null, pairings: (w.pairings && w.pairings.length) ? w.pairings : null,
+          awards: w.awards ? String(w.awards).split(';').map(s => s.trim()).filter(Boolean) : null,
+          region: w.region || wineryRegion, "subRegion": w.subRegion || null,
+          published: true, wineryId,
+        };
         const { data } = await sb.from('wines').insert(row).select().single();
         if (data) w.id = data.id;
       }
@@ -91,7 +112,7 @@
     },
   };
 
-  function normWine(r) { return { id: r.id, name: r.name, variety: r.variety, vintage: r.vintage, price: +r.price || 0, qty: +r.qty || 0, scans: +r.scans || 0 }; }
+  function normWine(r) { return { id: r.id, name: r.name, variety: r.variety, colour: r.colour, vintage: r.vintage, price: +r.price || 0, qty: +r.stock || +r.qty || 0, scans: +r.scans || 0 }; }
   function normOrder(r) {
     const items = (r.order_items || []).map(i => `${i.qty} × ${i.name}`).join(' · ');
     return { id: r.id, placedAt: rel(r.placedAt), destination: r.destination, items, total: +r.total || 0, status: r.status };
