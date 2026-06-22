@@ -19,12 +19,21 @@
   ];
   const DEMO_ORDERS = [];
 
-  let sb = null, session = null, wineryId = null, wineryName = 'Ata Rangi', wineryRegion = 'Martinborough';
+  let sb = null, session = null;
+  // Multi-site: one login can manage several winery sites. `sites` holds them all;
+  // `activeWineryId` is the one currently shown in the portal.
+  let sites = [];
+  let activeWineryId = null;
+  const ACTIVE_KEY = 'aiwine:activeSite';
+  const activeSite = () => sites.find(s => s.id === activeWineryId) || sites[0] || null;
   const Store = {
     mode: LIVE ? 'live' : 'demo',
     wines: [], orders: [],
-    get wineryName() { return wineryName; },
-    get wineryRegion() { return wineryRegion; },
+    get wineryName() { const s = activeSite(); return s ? s.name : 'Ata Rangi'; },
+    get wineryRegion() { const s = activeSite(); return s ? s.region : 'Martinborough'; },
+    get sites() { return sites; },
+    get activeWineryId() { return activeWineryId; },
+    get activeSite() { return activeSite(); },
 
     // ---- boot: load Supabase lib + restore session (live) or seed (demo) ----
     async init() {
@@ -38,7 +47,7 @@
       const { data } = await sb.auth.getSession();
       session = data && data.session;
       if (!session) return { ok: false, needsAuth: true };
-      await loadWinery();
+      await loadSites();
       await Store.reload();
       return { ok: true };
     },
@@ -46,24 +55,21 @@
       const { data, error } = await sb.auth.signInWithPassword({ email, password });
       if (error) throw new Error(error.message);
       session = data.session;
-      await loadWinery();
+      await loadSites();
       await Store.reload();
       return true;
     },
-    async signUp(wineryName, region, email, password, licence) {
+    async signUp(wineryName, region, email, password, orderEmail) {
       if (!LIVE) throw new Error('Sign-up is available on the live portal.');
       wineryName = (wineryName || '').trim();
       if (!wineryName) throw new Error('Enter your winery name.');
       if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test((email || '').trim())) throw new Error('Enter a valid email.');
       if (!password || password.length < 6) throw new Error('Password must be at least 6 characters.');
-      licence = licence || {};
-      // Off-licence is required to sell alcohol through AIWine (winery is the seller).
-      if (!(licence.number || '').trim()) throw new Error('Enter your off-licence number — it appears on every wine listing.');
+      orderEmail = (orderEmail || '').trim();
+      if (orderEmail && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(orderEmail)) throw new Error('Enter a valid order email (or leave it blank to use your login email).');
       const meta = {
         winery_name: wineryName, winery_region: (region || '').trim(),
-        off_licence_number: (licence.number || '').trim(),
-        off_licence_expiry: (licence.expiry || '').trim(),
-        off_licence_authority: (licence.authority || '').trim(),
+        order_email: orderEmail,            // where orders go — may differ from the login
       };
       const { data, error } = await sb.auth.signUp({
         email: email.trim(), password,
@@ -72,7 +78,7 @@
       if (error) throw new Error(error.message);
       session = data.session;
       if (session) {            // email confirmation OFF — straight in
-        await loadWinery();
+        await loadSites();
         await Store.reload();
         return { ok: true, session: true };
       }
@@ -98,12 +104,46 @@
 
     async reload() {
       if (!LIVE) return;
-      const [w, o] = await Promise.all([
-        sb.from('wines').select('*').order('name'),
-        sb.from('orders').select('*, order_items(*)').order('placedAt', { ascending: false }),
-      ]);
+      if (!activeWineryId) await loadSites();
+      // RLS returns rows for ALL the operator's sites; the portal shows ONE active
+      // site at a time, so scope each query to it.
+      let wq = sb.from('wines').select('*').order('name');
+      let oq = sb.from('orders').select('*, order_items(*)').order('placedAt', { ascending: false });
+      if (activeWineryId) { wq = wq.eq('wineryId', activeWineryId); oq = oq.eq('wineryId', activeWineryId); }
+      const [w, o] = await Promise.all([wq, oq]);
       Store.wines = (w.data || []).map(normWine);
       Store.orders = (o.data || []).map(normOrder);
+    },
+
+    // ---- multi-site ----
+    async setActiveSite(id) {
+      if (!sites.find(s => s.id === id)) return;
+      activeWineryId = id;
+      try { localStorage.setItem(ACTIVE_KEY, id); } catch (e) {}
+      await Store.reload();
+    },
+    async addSite(site) {
+      if (!LIVE) throw new Error('Adding a site is available on the live portal.');
+      site = site || {};
+      const name = (site.name || '').trim();
+      if (!name) throw new Error('Enter a name for the new site.');
+      const { data, error } = await sb.rpc('add_site', {
+        p_name: name, p_region: (site.region || '').trim(), p_address: (site.address || '').trim(),
+        p_order_email: (site.orderEmail || '').trim(),
+      });
+      if (error) throw new Error(error.message);
+      await loadSites();
+      if (data) await Store.setActiveSite(data);
+      return data;
+    },
+    async updateOrderEmail(email) {
+      if (!LIVE) return;
+      if (!activeWineryId) await loadSites();
+      if (!activeWineryId) return;
+      email = (email || '').trim();
+      if (email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) throw new Error('Enter a valid order email.');
+      await sb.from('wineries').update({ order_email: email || null }).eq('id', activeWineryId);
+      const s = activeSite(); if (s) s.orderEmail = email;
     },
 
     // ---- mutations (write-through) ----
@@ -123,8 +163,8 @@
           vintage: w.vintage, price: w.price, stock: w.qty, organic: !!w.organic,
           notes: w.notes || null, pairings: (w.pairings && w.pairings.length) ? w.pairings : null,
           awards: w.awards ? String(w.awards).split(';').map(s => s.trim()).filter(Boolean) : null,
-          region: w.region || wineryRegion, "subRegion": w.subRegion || null,
-          published: true, wineryId,
+          region: w.region || Store.wineryRegion, "subRegion": w.subRegion || null,
+          published: true, wineryId: activeWineryId,
         };
         const { data } = await sb.from('wines').insert(row).select().single();
         if (data) w.id = data.id;
@@ -138,34 +178,6 @@
       const o = Store.orders.find(x => x.id === id); if (o) Object.assign(o, patch);
       if (LIVE) await sb.from('orders').update(patch).eq('id', id);
     },
-    // ---- off-licence (winery record) ----
-    async updateLicence(fields) {
-      if (!LIVE) return;
-      if (!wineryId) await loadWinery();
-      if (!wineryId) return;
-      const row = {};
-      if (fields.number !== undefined)    row.off_licence_number = fields.number || null;
-      if (fields.expiry !== undefined)    row.off_licence_expiry = fields.expiry || null;
-      if (fields.authority !== undefined) row.off_licence_authority = fields.authority || null;
-      if (fields.address !== undefined)   row.address = fields.address || null;
-      if (fields.certUrl !== undefined)   row.off_licence_cert_url = fields.certUrl || null;
-      await sb.from('wineries').update(row).eq('id', wineryId);
-    },
-    // Upload the off-licence certificate to public Storage, save its URL on the winery.
-    async uploadLicenceCert(file) {
-      if (!LIVE || !file) return null;
-      if (!wineryId) await loadWinery();
-      if (!wineryId) throw new Error('No winery to attach the certificate to yet.');
-      const ext = ((file.name || '').split('.').pop() || 'pdf').toLowerCase().replace(/[^a-z0-9]/g, '') || 'pdf';
-      const path = wineryId + '/off-licence.' + ext;
-      const up = await sb.storage.from('winery-licences')
-        .upload(path, file, { upsert: true, contentType: file.type || undefined });
-      if (up.error) throw new Error(up.error.message);
-      const { data } = sb.storage.from('winery-licences').getPublicUrl(path);
-      const url = (data && data.publicUrl) || null;
-      if (url) await sb.from('wineries').update({ off_licence_cert_url: url }).eq('id', wineryId);
-      return url;
-    },
   };
 
   function normWine(r) { return { id: r.id, name: r.name, variety: r.variety, colour: r.colour, vintage: r.vintage, price: +r.price || 0, qty: +r.stock || +r.qty || 0, scans: +r.scans || 0 }; }
@@ -175,13 +187,23 @@
   }
   function rel(ts) { if (!ts) return ''; const d = (Date.now() - new Date(ts)) / 86400000; return d < 1 ? 'today' : d < 2 ? 'yesterday' : Math.floor(d) + ' days ago'; }
 
-  async function loadWinery() {
-    const { data: map } = await sb.from('winery_users').select('wineryId').limit(1).maybeSingle();
-    wineryId = map ? map.wineryId : null;
-    if (wineryId) {
-      const { data: w } = await sb.from('wineries').select('name,region').eq('id', wineryId).maybeSingle();
-      if (w) { wineryName = w.name; wineryRegion = w.region; }
-    }
+  // Load EVERY winery this login manages (multi-site), pick the active one.
+  async function loadSites() {
+    const { data: maps } = await sb.from('winery_users').select('wineryId, isPrimary');
+    const ids = (maps || []).map(m => m.wineryId).filter(Boolean);
+    if (!ids.length) { sites = []; activeWineryId = null; return; }
+    const primaryId = (maps.find(m => m.isPrimary) || {}).wineryId || ids[0];
+    const { data: rows } = await sb.from('wineries')
+      .select('id,name,region,address,order_email')
+      .in('id', ids);
+    const byId = {}; (rows || []).forEach(r => { byId[r.id] = r; });
+    sites = ids.map(id => {
+      const r = byId[id] || {};
+      return { id, name: r.name || 'Winery', region: r.region || '', address: r.address || '',
+        orderEmail: r.order_email || '', isPrimary: id === primaryId };
+    });
+    let saved = null; try { saved = localStorage.getItem(ACTIVE_KEY); } catch (e) {}
+    activeWineryId = (saved && sites.find(s => s.id === saved)) ? saved : primaryId;
   }
   function loadLib() {
     return new Promise((res, rej) => {

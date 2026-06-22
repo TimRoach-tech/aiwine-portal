@@ -51,7 +51,7 @@
   // ---------- plans / activation (demo; Stripe + Supabase flag at go-live) ----------
   const PLAN_KEY='aiwine-portal:plan';
   let PLAN; try{ PLAN=JSON.parse(localStorage.getItem(PLAN_KEY))||{}; }catch(e){ PLAN={}; }
-  PLAN=Object.assign({ cellarDoor:false, grow:false, story:'', hours:'', activatedVia:'', licNumber:'', licExpiry:'', licAuthority:'', licAddress:'', licCert:'' }, PLAN);
+  PLAN=Object.assign({ cellarDoor:false, grow:false, story:'', hours:'', activatedVia:'' }, PLAN);
   function savePlan(){ try{ localStorage.setItem(PLAN_KEY, JSON.stringify(PLAN)); }catch(e){} }
   const CODES={ 'FOUNDING49':{price:49,label:'Founding'}, 'WAIRARAPA':{price:0,label:'Wairarapa Association'} };
   function activate(via, price){ PLAN.cellarDoor=true; PLAN.activatedVia=via; savePlan(); go('plan'); toast(price?('Virtual Cellar Door active \u00b7 $'+price+'/yr'):'Virtual Cellar Door active \u00b7 free'); }
@@ -94,9 +94,9 @@
       <aside class="side" id="side">
         <div class="side-top">
           <div class="wordmark">AI<span class="dot"></span>Wine<span class="sfx">Partner</span></div>
-          <div class="winery-badge">
+          <div class="winery-badge"${(PStore.sites&&PStore.sites.length>1)?' id="site-switch" style="cursor:pointer" title="Switch site"':''}>
             <span class="av">${esc((PStore.wineryName||'A').charAt(0))}</span>
-            <div style="min-width:0"><div class="nm">${esc(PStore.wineryName||'My Winery')}</div><div class="rg">${esc(PStore.wineryRegion||'')}</div></div>
+            <div style="min-width:0"><div class="nm">${esc(PStore.wineryName||'My Winery')}</div><div class="rg">${esc(PStore.wineryRegion||'')}${(PStore.sites&&PStore.sites.length>1)?' \u00b7 '+PStore.sites.length+' sites \u25be':''}</div></div>
           </div>
         </div>
         <nav class="nav" id="nav">
@@ -134,6 +134,7 @@
 
     $('#nav').addEventListener('click', e=>{ const b=e.target.closest('[data-go]'); if(b) go(b.dataset.go); });
     $('#menu').addEventListener('click', ()=>$('#side').classList.toggle('open'));
+    const sw = document.getElementById('site-switch'); if (sw) sw.addEventListener('click', openSiteSwitcher);
     $('#t-add').addEventListener('click', addWineModal);
     $('#t-app').addEventListener('click', ()=>{ if(PLAN.grow){ window.open(WINERY_APP,'_blank'); } else { go('app'); } });
     $('#scrim').addEventListener('click', closeModal);
@@ -274,16 +275,28 @@
   RENDER.orders = el => {
     const seg = el._seg || 'open';
     const rows = ORDERS.filter(o=> seg==='open' ? o.status!=='shipped' : o.status==='shipped');
+    const oe = (PStore.activeSite && PStore.activeSite.orderEmail) || '';
+    const emailCard = (PStore.mode==='live') ? `
+      <div class="card card-pad" style="margin-bottom:18px;display:flex;align-items:flex-end;gap:14px;flex-wrap:wrap">
+        <div style="flex:1;min-width:240px">
+          <div class="label" style="color:var(--brass);margin-bottom:6px">Order email · ${esc(PStore.wineryName||'this site')}</div>
+          <div style="font-size:12.5px;color:var(--ink-soft);line-height:1.5;margin-bottom:9px">Every order for this winery is emailed here. It can differ from your login.</div>
+          <input id="oe-input" type="email" value="${esc(oe)}" placeholder="orders@your-winery.co.nz" style="width:100%;max-width:360px;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:var(--card-2);font-size:14px">
+        </div>
+        <button class="btn primary" id="oe-save">Save order email</button>
+      </div>` : '';
     el.innerHTML = `
       <div class="page-head">
         <div><div class="eyebrow">Fulfilment</div><h1 class="page-title"><em>Orders</em>.</h1>
         <div class="sub-line">Orders come straight from the customer to you — pack and ship from your cellar door.</div></div>
         <div class="seg"><button data-seg="open" class="${seg==='open'?'on':''}">To fulfil</button><button data-seg="shipped" class="${seg==='shipped'?'on':''}">Shipped</button></div>
       </div>
+      ${emailCard}
       <div class="card"><div class="tbl-wrap"><table class="tbl">
         <thead><tr><th>Order</th><th>Items</th><th>Destination</th><th class="r">Total</th><th>Status</th><th></th></tr></thead>
         <tbody>${rows.map(orderRow).join('')||`<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:30px">Nothing here.</td></tr>`}</tbody>
       </table></div></div>`;
+    const oeSave=el.querySelector('#oe-save'); if(oeSave) oeSave.addEventListener('click', async ()=>{ try{ await PStore.updateOrderEmail(el.querySelector('#oe-input').value); toast('Order email saved'); }catch(e){ toast(e.message||'Could not save'); } });
     el.querySelectorAll('[data-seg]').forEach(b=>b.addEventListener('click',()=>{ el._seg=b.dataset.seg; RENDER.orders(el); }));
     el.querySelectorAll('[data-ship]').forEach(b=>b.addEventListener('click',()=>{ const o=ORDERS.find(x=>x.id===b.dataset.ship); PStore.updateOrder(o.id,{status:'shipped'}); updateBadges(); RENDER.orders(el); toast('Marked shipped · '+o.id); }));
     el.querySelectorAll('[data-pack]').forEach(b=>b.addEventListener('click',()=>{ const o=ORDERS.find(x=>x.id===b.dataset.pack); PStore.updateOrder(o.id,{status:'packing'}); RENDER.orders(el); toast('Moved to packing · '+o.id); }));
@@ -316,7 +329,6 @@
           <div class="label" style="margin-bottom:12px">Good to know</div>
           <div style="display:flex;flex-direction:column;gap:13px;font-size:13px;color:var(--ink-soft);line-height:1.55">
             <div>${ic('check',14,'var(--green)')} Dropdowns keep variety, colour &amp; region spelt consistently.</div>
-            <div>${ic('check',14,'var(--green)')} Add your <b>off-licence number</b> — it shows on every wine listing.</div>
             <div>${ic('check',14,'var(--green)')} One row per wine — delete the grey example rows (they're skipped anyway).</div>
             <div>${ic('check',14,'var(--green)')} Tasting notes are kept to ~25 words so cards stay tidy.</div>
             <div>${ic('check',14,'var(--green)')} Nothing changes until you review the preview and confirm.</div>
@@ -326,7 +338,7 @@
       </div>`;
     const drop=el.querySelector('#drop'), file=el.querySelector('#file');
     el.querySelector('#pick').addEventListener('click',()=>file.click());
-    el.querySelector('#tmpl').addEventListener('click',()=>{ const csv='wine name,variety,colour,vintage,price (incl GST),stock,style,organic (Y/N),region,sub-region,tasting notes (max 25 words),food pairings (semicolon ;),awards (semicolon ;),off-licence number\nCrimson Pinot Noir,Pinot Noir,Red,2023,32,60,medium-bodied,N,Wairarapa,Martinborough,"Bright cherry, plum and soft spice \u2014 an easy, food-friendly red.",roast duck;mushroom risotto;pizza,Gold \u00b7 NZ IWS 2025,12/OFF/0356/2024\n'; const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'})); a.download='AIWine_range_template.csv'; a.click(); toast('Template downloaded'); });
+    el.querySelector('#tmpl').addEventListener('click',()=>{ const csv='wine name,variety,colour,vintage,price (incl GST),stock,style,organic (Y/N),region,sub-region,tasting notes (max 25 words),food pairings (semicolon ;),awards (semicolon ;)\nCrimson Pinot Noir,Pinot Noir,Red,2023,32,60,medium-bodied,N,Wairarapa,Martinborough,"Bright cherry, plum and soft spice \u2014 an easy, food-friendly red.",roast duck;mushroom risotto;pizza,Gold \u00b7 NZ IWS 2025\n'; const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'})); a.download='AIWine_range_template.csv'; a.click(); toast('Template downloaded'); });
     file.addEventListener('change',e=>{ if(e.target.files[0]) parseFile(e.target.files[0], el); });
     ['dragenter','dragover'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add('over');}));
     ['dragleave','drop'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove('over');}));
@@ -345,7 +357,7 @@
       const cells=lines.map(l=>l.split(',').map(c=>c.trim().replace(/^"|"$/g,'')));
       const head=cells[0].map(h=>h.toLowerCase());
       const find=keys=>head.findIndex(h=>keys.some(k=>h.includes(k)));
-      const ci={ name:find(['wine name','name','wine']), variety:find(['variet','grape']), colour:find(['colour','color','type']), vintage:find(['vintage','year']), price:find(['price','rrp','cost']), stock:find(['stock','qty','quantity','cellar']), notes:find(['tasting','notes','descrip']), pairings:find(['pairing','food','match']), style:find(['style','body']), organic:find(['organic']), awards:find(['award','medal']), region:find(['region']), sub:find(['sub-region','subregion','sub region']), licence:find(['off-licence','off licence','off-license','licence number','license number','licence','license']) };
+      const ci={ name:find(['wine name','name','wine']), variety:find(['variet','grape']), colour:find(['colour','color','type']), vintage:find(['vintage','year']), price:find(['price','rrp','cost']), stock:find(['stock','qty','quantity','cellar']), notes:find(['tasting','notes','descrip']), pairings:find(['pairing','food','match']), style:find(['style','body']), organic:find(['organic']), awards:find(['award','medal']), region:find(['region']), sub:find(['sub-region','subregion','sub region']) };
       // canonical lists — snap dropdown fields to correct spelling/case on import
       const L_VAR=['Sparkling','Sauvignon Blanc','Riesling','Pinot Gris','Gewürztraminer','Albariño','Viognier','Chardonnay','Chenin Blanc','Semillon','White Blend','Rosé','Pinot Noir','Syrah','Merlot','Cabernet Sauvignon','Malbec','Tempranillo','Red Blend','Dessert','Fortified','Other'];
       const L_COL=['Red','White','Rosé','Sparkling','Dessert','Fortified'];
@@ -362,7 +374,7 @@
         if(isExample(name)){ skipped++; return null; }
         const tn=trim25(at(c,ci.notes)); if(tn.cut)trimmedN++;
         const pair=at(c,ci.pairings).split(';').map(s=>s.trim()).filter(Boolean).slice(0,3);
-        return { name, variety:snap(at(c,ci.variety),L_VAR), colour:snap(at(c,ci.colour),L_COL), vintage:at(c,ci.vintage), price:at(c,ci.price), stock:at(c,ci.stock), notes:tn.text, pairings:pair, style:snap(at(c,ci.style),L_STY), organic:/^y/i.test(at(c,ci.organic)), awards:at(c,ci.awards), region:snap(at(c,ci.region),L_REG), sub:at(c,ci.sub), licence:at(c,ci.licence) };
+        return { name, variety:snap(at(c,ci.variety),L_VAR), colour:snap(at(c,ci.colour),L_COL), vintage:at(c,ci.vintage), price:at(c,ci.price), stock:at(c,ci.stock), notes:tn.text, pairings:pair, style:snap(at(c,ci.style),L_STY), organic:/^y/i.test(at(c,ci.organic)), awards:at(c,ci.awards), region:snap(at(c,ci.region),L_REG), sub:at(c,ci.sub) };
       }).filter(Boolean);
       const matched=rows.filter(x=>WINES.some(w=>w.name.toLowerCase()===String(x.name).toLowerCase())).length;
       prev.innerHTML=`<div class="card">
@@ -370,7 +382,7 @@
         <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Wine</th><th>Variety</th><th>Vintage</th><th>Price</th><th>Stock</th><th></th></tr></thead>
         <tbody>${rows.slice(0,12).map(x=>{ const isNew=!WINES.some(w=>w.name.toLowerCase()===String(x.name).toLowerCase()); return `<tr><td style="font-weight:600">${esc(x.name)||'<span style="color:var(--red)">missing</span>'}</td><td>${esc(x.variety)}</td><td class="mono" style="font-size:12px">${esc(x.vintage)}</td><td class="mono" style="font-size:12px">${x.price?'$'+esc(x.price):''}</td><td class="mono" style="font-size:12px">${esc(x.stock)}</td><td>${isNew?'<span class="pill new">New</span>':'<span class="pill in">Update</span>'}</td></tr>`; }).join('')}</tbody></table></div>
         <div class="card-pad" style="display:flex;justify-content:space-between;align-items:center;border-top:1px solid var(--line-soft)">
-          <span style="font-size:12.5px;color:var(--muted)">${rows.length>12?'+ '+(rows.length-12)+' more':'All rows shown'}${trimmedN?' · '+trimmedN+' note'+(trimmedN>1?'s':'')+' shortened to 25 words':''}${rows.some(x=>x.licence)?' · off-licence number captured':''}</span>
+          <span style="font-size:12.5px;color:var(--muted)">${rows.length>12?'+ '+(rows.length-12)+' more':'All rows shown'}${trimmedN?' · '+trimmedN+' note'+(trimmedN>1?'s':'')+' shortened to 25 words':''}</span>
           <button class="btn primary" id="confirm">${ic('check',15)} Confirm &amp; publish ${rows.length} wines</button>
         </div></div>`;
       prev.querySelector('#confirm').addEventListener('click',()=>{ toast('Published · '+rows.length+' wines synced to AIWine 🍷'); prev.innerHTML='<div class="card card-pad" style="text-align:center"><div style="color:var(--green);margin-bottom:6px">'+ic('check',26,'var(--green)')+'</div><div style="font-weight:700">Your range is live</div><div style="font-size:13px;color:var(--ink-soft);margin-top:4px">Customers see the changes now. (Demo — no data was written.)</div></div>'; });
@@ -414,11 +426,6 @@
           <div class="field"><label>Your story</label><textarea id="cd-story" rows="4" style="width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:var(--card-2);font-family:var(--sans);font-size:14px;resize:vertical" placeholder="Tell visitors who you are\u2026">${esc(PLAN.story||'')}</textarea></div>
           <div class="field"><label>Visit / tasting hours</label><input id="cd-hours" value="${esc(PLAN.hours||'')}" placeholder="Fri\u2013Sun \u00b7 11am\u20134pm" style="width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:var(--card-2);font-size:14px"></div>
           <div class="field"><label>Hero photo</label><div style="border:2px dashed var(--line);border-radius:8px;padding:22px;text-align:center;color:var(--muted);font-size:13px">Drag a photo here (demo) \u2014 shown on your public profile</div></div>
-          <div style="padding-top:14px;border-top:1px solid var(--line-soft)"><div class="label" style="color:var(--brass);margin-bottom:5px">Licence &amp; compliance</div><div style="font-size:12.5px;color:var(--ink-soft);line-height:1.55">Shown on every wine listing and here on your cellar-door page. AIWine is your sales agent \u2014 you remain the licensed seller and supplier under your own off-licence.</div></div>
-          <div class="field"><label>Off-licence number</label><input id="cd-lnum" value="${esc(PLAN.licNumber||'')}" placeholder="e.g. 12/OFF/0356/2024" style="width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:var(--card-2);font-size:14px"></div>
-          <div class="grid-2"><div class="field"><label>Expiry date</label><input id="cd-lexp" value="${esc(PLAN.licExpiry||'')}" placeholder="e.g. 14 March 2027" style="width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:var(--card-2);font-size:14px"></div><div class="field"><label>Issuing authority</label><input id="cd-lauth" value="${esc(PLAN.licAuthority||'')}" placeholder="e.g. South Wairarapa District Council" style="width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:var(--card-2);font-size:14px"></div></div>
-          <div class="field"><label>Licensed premises / address</label><input id="cd-laddr" value="${esc(PLAN.licAddress||'')}" placeholder="e.g. Arapai Vineyard, Martinborough" style="width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:var(--card-2);font-size:14px"></div>
-          <div class="field"><label>Certificate <span style="color:var(--muted);font-weight:400">(PDF or image \u2014 ${PLAN.licCert?'on file':'shown to customers'})</span></label><input id="cd-lcert" type="file" accept=".pdf,image/*" style="font-size:13px"></div>
           <div style="display:flex;justify-content:flex-end"><button class="btn primary" id="cd-save">Save \u2014 publish to my profile</button></div>
         </div>
       </div>`;
@@ -439,7 +446,7 @@
       el.querySelector('#act-code').addEventListener('click',()=>{ const c=(el.querySelector('#code').value||'').trim().toUpperCase(); const hit=CODES[c]; if(!hit){ toast('That code isn\u2019t valid'); return; } activate(hit.label, hit.price); });
       el.querySelectorAll('[data-pay]').forEach(b=>b.addEventListener('click',()=>demoCheckout(+b.dataset.pay)));
     } else {
-      el.querySelector('#cd-save').addEventListener('click', async ()=>{ PLAN.story=el.querySelector('#cd-story').value; PLAN.hours=el.querySelector('#cd-hours').value; PLAN.licNumber=el.querySelector('#cd-lnum').value.trim(); PLAN.licExpiry=el.querySelector('#cd-lexp').value.trim(); PLAN.licAuthority=el.querySelector('#cd-lauth').value.trim(); PLAN.licAddress=el.querySelector('#cd-laddr').value.trim(); const cf=el.querySelector('#cd-lcert'); if(cf&&cf.files&&cf.files[0]) PLAN.licCert=cf.files[0].name; savePlan(); if(PStore.mode==='live'){ try{ if(PStore.updateLicence) await PStore.updateLicence({number:PLAN.licNumber,expiry:PLAN.licExpiry,authority:PLAN.licAuthority,address:PLAN.licAddress}); if(cf&&cf.files&&cf.files[0]&&PStore.uploadLicenceCert) await PStore.uploadLicenceCert(cf.files[0]); }catch(e){ toast('Saved \u2014 certificate upload failed, try again'); } } toast('Cellar door updated \u00b7 live on your profile'); });
+      el.querySelector('#cd-save').addEventListener('click', async ()=>{ PLAN.story=el.querySelector('#cd-story').value; PLAN.hours=el.querySelector('#cd-hours').value; savePlan(); toast('Cellar door updated \u00b7 live on your profile'); });
     }
     const gb=el.querySelector('#grow-buy'); if(gb) gb.addEventListener('click',()=>demoCheckout(95,'grow'));
   };
@@ -591,6 +598,56 @@
   function openModal(){ $('#scrim').classList.add('open'); $('#modal').classList.add('open'); }
   function closeModal(){ $('#scrim').classList.remove('open'); $('#modal').classList.remove('open'); }
 
+  // ---------- multi-site: switch / add ----------
+  function openSiteSwitcher(){
+    const sites = (PStore.sites||[]);
+    $('#modal').innerHTML = `
+      <div class="modal-head"><h2>Your sites</h2><button class="btn-quiet" id="m-x">${ic('x',18)}</button></div>
+      <div class="modal-body">
+        <div style="font-size:12.5px;color:var(--ink-soft);line-height:1.5;margin-bottom:14px">Each site is managed separately — own order email and cellar door. Pick the one to manage.</div>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          ${sites.map(s=>`<button class="site-row${s.id===PStore.activeWineryId?' on':''}" data-site="${esc(s.id)}" style="display:flex;align-items:center;gap:12px;text-align:left;padding:13px 14px;border:1px solid ${s.id===PStore.activeWineryId?'var(--brass)':'var(--line)'};border-radius:10px;background:${s.id===PStore.activeWineryId?'var(--card-2)':'var(--card)'};cursor:pointer">
+            <span class="av" style="width:34px;height:34px;border-radius:8px;display:flex;align-items:center;justify-content:center;background:var(--bg-alt);font-family:var(--serif);font-weight:600;flex:none">${esc((s.name||'?').charAt(0))}</span>
+            <span style="min-width:0;flex:1"><span style="display:block;font-weight:600;font-size:14px">${esc(s.name)}</span><span style="display:block;font-size:11.5px;color:var(--muted)">${esc(s.region||'—')}${s.orderEmail?' · '+esc(s.orderEmail):''}</span></span>
+            ${s.id===PStore.activeWineryId?`<span style="font-family:var(--mono);font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--brass)">Active</span>`:''}
+          </button>`).join('')}
+        </div>
+      </div>
+      <div class="modal-foot"><button class="btn" id="m-cancel">Close</button><button class="btn primary" id="m-addsite">${ic('plus',15)} Add a site</button></div>`;
+    openModal();
+    $('#m-x').onclick=closeModal; $('#m-cancel').onclick=closeModal;
+    $('#m-addsite').onclick=openAddSite;
+    $('#modal').querySelectorAll('[data-site]').forEach(b=>b.addEventListener('click', async ()=>{
+      const id=b.dataset.site; if(id===PStore.activeWineryId){ closeModal(); return; }
+      closeModal(); toast('Switching site…');
+      try { await PStore.setActiveSite(id); WINES=PStore.wines; ORDERS=PStore.orders; shell(); go(route||'dashboard'); toast('Now managing '+PStore.wineryName); }
+      catch(e){ toast(e.message||'Could not switch'); }
+    }));
+  }
+  function openAddSite(){
+    $('#modal').innerHTML = `
+      <div class="modal-head"><h2>Add a site</h2><button class="btn-quiet" id="m-x">${ic('x',18)}</button></div>
+      <div class="modal-body">
+        <div style="font-size:12.5px;color:var(--ink-soft);line-height:1.5;margin-bottom:14px">A second location under your login. It’s managed as a separate winery, so give it a distinct name and its own order email.</div>
+        <div class="field"><label>Site name</label><input id="as-name" placeholder="e.g. Ata Rangi — Central Otago" autofocus></div>
+        <div class="grid-2"><div class="field"><label>Region</label><input id="as-region" placeholder="e.g. Central Otago"></div><div class="field"><label>Order email</label><input id="as-email" type="email" placeholder="orders@…"></div></div>
+        <div class="field"><label>Licensed premises / address</label><input id="as-addr" placeholder="Vineyard address"></div>
+        <div id="as-err" style="color:var(--red);font-size:12.5px;margin-top:6px;display:none"></div>
+      </div>
+      <div class="modal-foot"><button class="btn" id="m-cancel">Cancel</button><button class="btn primary" id="m-save">${ic('plus',15)} Add site</button></div>`;
+    openModal();
+    $('#m-x').onclick=closeModal; $('#m-cancel').onclick=openSiteSwitcher;
+    $('#m-save').onclick=async ()=>{
+      const name=$('#as-name').value.trim(); const errEl=$('#as-err');
+      if(!name){ errEl.textContent='Enter a site name.'; errEl.style.display=''; return; }
+      const btn=$('#m-save'); btn.disabled=true; btn.textContent='Adding…';
+      try {
+        await PStore.addSite({ name, region:$('#as-region').value, orderEmail:$('#as-email').value, address:$('#as-addr').value });
+        WINES=PStore.wines; ORDERS=PStore.orders; closeModal(); shell(); go('dashboard'); toast('Site added · now managing '+PStore.wineryName);
+      } catch(e){ btn.disabled=false; btn.textContent='Add site'; errEl.textContent=e.message||'Could not add site'; errEl.style.display=''; }
+    };
+  }
+
   // ---------- login (live mode) ----------
   function renderLogin(err){
     document.getElementById('app').innerHTML = `
@@ -624,18 +681,9 @@
         <div style="font-size:12.5px;color:var(--ink-soft);line-height:1.5;margin-bottom:18px">List your wines on AIWine. Free to join &mdash; upload your range and manage stock &amp; prices anytime.</div>
         <div class="field" style="margin-bottom:11px"><label>Winery name</label><input id="sw" type="text" placeholder="e.g. Ata Rangi" autofocus></div>
         <div class="field" style="margin-bottom:11px"><label>Region</label><input id="sr" type="text" placeholder="e.g. Martinborough"></div>
-        <div class="field" style="margin-bottom:11px"><label>Email</label><input id="se" type="email" placeholder="you@winery.co.nz"></div>
+        <div class="field" style="margin-bottom:11px"><label>Login email</label><input id="se" type="email" placeholder="you@winery.co.nz"></div>
         <div class="field" style="margin-bottom:14px"><label>Password</label><input id="sp" type="password" placeholder="At least 6 characters"></div>
-        <div style="margin:2px 0 12px;padding-top:14px;border-top:1px solid var(--line)">
-          <div style="font-family:var(--mono);font-size:10px;letter-spacing:0.14em;text-transform:uppercase;color:var(--brass);margin-bottom:5px">Your off-licence</div>
-          <div style="font-size:11.5px;color:var(--ink-soft);line-height:1.5">You sell as the licensed winery &mdash; AIWine is your agent. Your off-licence number shows on every wine listing; a copy of the certificate appears on your cellar-door page.</div>
-        </div>
-        <div class="field" style="margin-bottom:11px"><label>Off-licence number</label><input id="sln" type="text" placeholder="e.g. 12/OFF/0356/2024"></div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:11px">
-          <div class="field"><label>Expiry date</label><input id="slx" type="text" placeholder="e.g. 14 Mar 2027"></div>
-          <div class="field"><label>Issuing council</label><input id="sla" type="text" placeholder="e.g. South Wairarapa DC"></div>
-        </div>
-        <div class="field" style="margin-bottom:14px"><label>Certificate <span style="color:var(--muted);font-weight:400">(PDF or image)</span></label><input id="slc" type="file" accept=".pdf,image/*" style="font-size:12px"></div>
+        <div class="field" style="margin-bottom:14px"><label>Order email <span style="color:var(--muted);font-weight:400">(where orders are sent)</span></label><input id="soe" type="email" placeholder="Leave blank to use your login email"><div style="font-size:11px;color:var(--muted);line-height:1.45;margin-top:5px">Customer orders for your wines go straight to this inbox &mdash; it can differ from your login.</div></div>
         ${err?`<div style="color:var(--red);font-size:12.5px;margin-bottom:12px">${esc(err)}</div>`:''}
         <button class="btn primary" type="submit" style="width:100%;justify-content:center">Create account</button>
         <div style="text-align:center;margin-top:14px;font-size:12.5px;color:var(--ink-soft)">Already registered? <button type="button" id="sf-back" style="background:none;border:none;color:var(--claret);font-weight:600;cursor:pointer;font-size:12.5px">Sign in</button></div>
@@ -649,9 +697,8 @@
         const r = await PStore.signUp(
           document.getElementById('sw').value, document.getElementById('sr').value,
           document.getElementById('se').value, document.getElementById('sp').value,
-          { number: document.getElementById('sln').value, expiry: document.getElementById('slx').value, authority: document.getElementById('sla').value });
+          document.getElementById('soe').value);
         if (r.session) {
-          try { var _cf = document.getElementById('slc'); if (_cf && _cf.files && _cf.files[0] && PStore.uploadLicenceCert) await PStore.uploadLicenceCert(_cf.files[0]); } catch (e2) {}
           boot();
         }
         else {
