@@ -50,6 +50,34 @@
       await Store.reload();
       return true;
     },
+    async signUp(wineryName, region, email, password, licence) {
+      if (!LIVE) throw new Error('Sign-up is available on the live portal.');
+      wineryName = (wineryName || '').trim();
+      if (!wineryName) throw new Error('Enter your winery name.');
+      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test((email || '').trim())) throw new Error('Enter a valid email.');
+      if (!password || password.length < 6) throw new Error('Password must be at least 6 characters.');
+      licence = licence || {};
+      // Off-licence is required to sell alcohol through AIWine (winery is the seller).
+      if (!(licence.number || '').trim()) throw new Error('Enter your off-licence number — it appears on every wine listing.');
+      const meta = {
+        winery_name: wineryName, winery_region: (region || '').trim(),
+        off_licence_number: (licence.number || '').trim(),
+        off_licence_expiry: (licence.expiry || '').trim(),
+        off_licence_authority: (licence.authority || '').trim(),
+      };
+      const { data, error } = await sb.auth.signUp({
+        email: email.trim(), password,
+        options: { data: meta },
+      });
+      if (error) throw new Error(error.message);
+      session = data.session;
+      if (session) {            // email confirmation OFF — straight in
+        await loadWinery();
+        await Store.reload();
+        return { ok: true, session: true };
+      }
+      return { ok: true, session: false };   // needs to confirm email first
+    },
     async signOut() { if (sb) await sb.auth.signOut(); session = null; },
 
     async resetPassword(email) {
@@ -109,6 +137,34 @@
     async updateOrder(id, patch) {
       const o = Store.orders.find(x => x.id === id); if (o) Object.assign(o, patch);
       if (LIVE) await sb.from('orders').update(patch).eq('id', id);
+    },
+    // ---- off-licence (winery record) ----
+    async updateLicence(fields) {
+      if (!LIVE) return;
+      if (!wineryId) await loadWinery();
+      if (!wineryId) return;
+      const row = {};
+      if (fields.number !== undefined)    row.off_licence_number = fields.number || null;
+      if (fields.expiry !== undefined)    row.off_licence_expiry = fields.expiry || null;
+      if (fields.authority !== undefined) row.off_licence_authority = fields.authority || null;
+      if (fields.address !== undefined)   row.address = fields.address || null;
+      if (fields.certUrl !== undefined)   row.off_licence_cert_url = fields.certUrl || null;
+      await sb.from('wineries').update(row).eq('id', wineryId);
+    },
+    // Upload the off-licence certificate to public Storage, save its URL on the winery.
+    async uploadLicenceCert(file) {
+      if (!LIVE || !file) return null;
+      if (!wineryId) await loadWinery();
+      if (!wineryId) throw new Error('No winery to attach the certificate to yet.');
+      const ext = ((file.name || '').split('.').pop() || 'pdf').toLowerCase().replace(/[^a-z0-9]/g, '') || 'pdf';
+      const path = wineryId + '/off-licence.' + ext;
+      const up = await sb.storage.from('winery-licences')
+        .upload(path, file, { upsert: true, contentType: file.type || undefined });
+      if (up.error) throw new Error(up.error.message);
+      const { data } = sb.storage.from('winery-licences').getPublicUrl(path);
+      const url = (data && data.publicUrl) || null;
+      if (url) await sb.from('wineries').update({ off_licence_cert_url: url }).eq('id', wineryId);
+      return url;
     },
   };
 

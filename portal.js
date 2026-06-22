@@ -33,6 +33,8 @@
   // ---------- demo data ----------
   const TINT = { 'Pinot Noir':'#6B1F2A','Chardonnay':'#C9A45A','Sauvignon Blanc':'#93A35E','Rosé':'#D9889A','Syrah':'#2A0E18','Riesling':'#D7BE54','Pinot Gris':'#D9B58C' };
   let WINES = []; let ORDERS = [];   // filled from PStore at boot (demo or live)
+  // Absolute URL to the winery app (portal & app are usually on different hosts).
+  const WINERY_APP = (window.PORTAL_CONFIG && window.PORTAL_CONFIG.WINERY_APP_URL) || '../apps/winery/index.html';
   const FEED = [
     { ic:'scan', t:'<b>Crimson Pinot Noir</b> scanned at a restaurant in <b>Auckland</b>', when:'12m' },
     { ic:'sparkle', t:'The AI Sommelier recommended <b>Craighall Chardonnay</b> to 8 people today — "roast chicken" was the top ask', when:'1h' },
@@ -49,7 +51,7 @@
   // ---------- plans / activation (demo; Stripe + Supabase flag at go-live) ----------
   const PLAN_KEY='aiwine-portal:plan';
   let PLAN; try{ PLAN=JSON.parse(localStorage.getItem(PLAN_KEY))||{}; }catch(e){ PLAN={}; }
-  PLAN=Object.assign({ cellarDoor:false, grow:false, story:'', hours:'', activatedVia:'' }, PLAN);
+  PLAN=Object.assign({ cellarDoor:false, grow:false, story:'', hours:'', activatedVia:'', licNumber:'', licExpiry:'', licAuthority:'', licAddress:'', licCert:'' }, PLAN);
   function savePlan(){ try{ localStorage.setItem(PLAN_KEY, JSON.stringify(PLAN)); }catch(e){} }
   const CODES={ 'FOUNDING49':{price:49,label:'Founding'}, 'WAIRARAPA':{price:0,label:'Wairarapa Association'} };
   function activate(via, price){ PLAN.cellarDoor=true; PLAN.activatedVia=via; savePlan(); go('plan'); toast(price?('Virtual Cellar Door active \u00b7 $'+price+'/yr'):'Virtual Cellar Door active \u00b7 free'); }
@@ -58,7 +60,8 @@
     if(what==='grow'){ PLAN.grow=true; savePlan(); go('plan'); toast('Grow unlocked \u00b7 insights & integrations'); }
     else { activate('subscribed', price); }
   }
-  function growLock(name){ return `<div class="page-head"><div><div class="eyebrow">Grow</div><h1 class="page-title"><em>${name}</em>.</h1></div></div><div class="card card-pad" style="text-align:center;padding:48px 24px"><div style="font-family:var(--serif);font-size:26px;margin-bottom:8px">${name} is part of <span style="color:var(--claret)">Grow</span></div><div style="font-size:13.5px;color:var(--ink-soft);max-width:440px;margin:0 auto 18px">Unlock scan insights, demand signals and API/EPOS integrations \u2014 $95/yr.</div><button class="btn primary" id="go-plan">See plans</button></div>`; }
+  function growLock(name){ return '<div class="page-head"><div><div class="eyebrow">Grow</div><h1 class="page-title"><em>'+name+'</em>.</h1><div class="sub-line">Part of the Grow package — here is everything it unlocks.</div></div></div><div class="card card-pad" style="padding:32px 28px"><div style="font-family:var(--serif);font-size:25px;margin-bottom:6px">'+name+' is part of <span style="color:var(--claret)">Grow</span> · $95/yr</div><div style="font-size:13.5px;color:var(--ink-soft);max-width:540px;margin-bottom:20px;line-height:1.55">Your portal and wine uploads are free forever. <b>Grow</b> adds the intelligence layer — how customers find and choose your wines across AIWine, and the tools to act on it.</div><div class="grow-feats">'+growFeatures()+'</div><button class="btn primary" id="go-plan" style="margin-top:20px">See plans · $95/yr</button></div>'; }
+  function growFeatures(){ var items=[['chart','Scan insights','See who is scanning your wines, how often and from which regions — your own data, visualised over time.'],['sparkle','Demand signals','What your region and all of New Zealand are asking the AI Sommelier for — spot a trend before it reaches your cellar door.'],['grid','Top asks &amp; most-scanned','The Sommelier questions that lead drinkers to you, and which of your wines are pulling ahead.'],['plug','API / EPOS sync','Connect Shopify, Vend or Square so stock keeps itself in sync — every sale and restock (coming soon).'],['passport','The winery app','Live scans and stock from your phone — perfect for the cellar door. Same login, same data.']]; return items.map(function(it){ return '<div class="grow-feat"><span class="gf-ic">'+ic(it[0],17)+'</span><div><div class="gf-t">'+it[1]+'</div><div class="gf-d">'+it[2]+'</div></div></div>'; }).join(''); }
   const VARIETIES = Object.keys(TINT);
 
   // ---------- helpers ----------
@@ -103,7 +106,6 @@
               ${n.badge?`<span class="badge" data-badge="${n.id}"></span>`:''}
             </button>`).join('')}
         </nav>
-        <div class="side-foot"><a href="../apps/winery/index.html" target="_blank">Open winery app ↗</a></div>
       </aside>
       <div class="main">
         <div class="topbar">
@@ -111,7 +113,7 @@
             <button class="btn-quiet menu-btn" id="menu">${ic('menu',20)}</button>
           </div>
           <div class="actions">
-            <button class="btn sm ghost" id="t-app">${ic('passport',15)} Open winery app ↗</button>
+            <button class="btn sm ghost" id="t-app">${ic('passport',15)} Winery app</button>
             <button class="btn sm primary" id="t-add">${ic('plus',15)} Add wine</button>
           </div>
         </div>
@@ -122,6 +124,8 @@
           <div id="screen-upload" class="screen"></div>
           <div id="screen-insights" class="screen"></div>
           <div id="screen-integrations" class="screen"></div>
+          <div id="screen-plan" class="screen"></div>
+          <div id="screen-app" class="screen"></div>
         </div>
       </div>
       <div class="scrim" id="scrim"></div>
@@ -131,7 +135,7 @@
     $('#nav').addEventListener('click', e=>{ const b=e.target.closest('[data-go]'); if(b) go(b.dataset.go); });
     $('#menu').addEventListener('click', ()=>$('#side').classList.toggle('open'));
     $('#t-add').addEventListener('click', addWineModal);
-    $('#t-app').addEventListener('click', ()=>window.open('../apps/winery/index.html','_blank'));
+    $('#t-app').addEventListener('click', ()=>{ if(PLAN.grow){ window.open(WINERY_APP,'_blank'); } else { go('app'); } });
     $('#scrim').addEventListener('click', closeModal);
     updateBadges();
   }
@@ -312,6 +316,7 @@
           <div class="label" style="margin-bottom:12px">Good to know</div>
           <div style="display:flex;flex-direction:column;gap:13px;font-size:13px;color:var(--ink-soft);line-height:1.55">
             <div>${ic('check',14,'var(--green)')} Dropdowns keep variety, colour &amp; region spelt consistently.</div>
+            <div>${ic('check',14,'var(--green)')} Add your <b>off-licence number</b> — it shows on every wine listing.</div>
             <div>${ic('check',14,'var(--green)')} One row per wine — delete the grey example rows (they're skipped anyway).</div>
             <div>${ic('check',14,'var(--green)')} Tasting notes are kept to ~25 words so cards stay tidy.</div>
             <div>${ic('check',14,'var(--green)')} Nothing changes until you review the preview and confirm.</div>
@@ -321,7 +326,7 @@
       </div>`;
     const drop=el.querySelector('#drop'), file=el.querySelector('#file');
     el.querySelector('#pick').addEventListener('click',()=>file.click());
-    el.querySelector('#tmpl').addEventListener('click',()=>{ const csv='name,variety,vintage,price,stock\nCrimson Pinot Noir,Pinot Noir,2023,32,60\n'; const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'})); a.download='AIWine_range_template.csv'; a.click(); toast('Template downloaded'); });
+    el.querySelector('#tmpl').addEventListener('click',()=>{ const csv='wine name,variety,colour,vintage,price (incl GST),stock,style,organic (Y/N),region,sub-region,tasting notes (max 25 words),food pairings (semicolon ;),awards (semicolon ;),off-licence number\nCrimson Pinot Noir,Pinot Noir,Red,2023,32,60,medium-bodied,N,Wairarapa,Martinborough,"Bright cherry, plum and soft spice \u2014 an easy, food-friendly red.",roast duck;mushroom risotto;pizza,Gold \u00b7 NZ IWS 2025,12/OFF/0356/2024\n'; const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'})); a.download='AIWine_range_template.csv'; a.click(); toast('Template downloaded'); });
     file.addEventListener('change',e=>{ if(e.target.files[0]) parseFile(e.target.files[0], el); });
     ['dragenter','dragover'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add('over');}));
     ['dragleave','drop'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove('over');}));
@@ -340,7 +345,7 @@
       const cells=lines.map(l=>l.split(',').map(c=>c.trim().replace(/^"|"$/g,'')));
       const head=cells[0].map(h=>h.toLowerCase());
       const find=keys=>head.findIndex(h=>keys.some(k=>h.includes(k)));
-      const ci={ name:find(['wine name','name','wine']), variety:find(['variet','grape']), colour:find(['colour','color','type']), vintage:find(['vintage','year']), price:find(['price','rrp','cost']), stock:find(['stock','qty','quantity','cellar']), notes:find(['tasting','notes','descrip']), pairings:find(['pairing','food','match']), style:find(['style','body']), organic:find(['organic']), awards:find(['award','medal']), region:find(['region']), sub:find(['sub-region','subregion','sub region']) };
+      const ci={ name:find(['wine name','name','wine']), variety:find(['variet','grape']), colour:find(['colour','color','type']), vintage:find(['vintage','year']), price:find(['price','rrp','cost']), stock:find(['stock','qty','quantity','cellar']), notes:find(['tasting','notes','descrip']), pairings:find(['pairing','food','match']), style:find(['style','body']), organic:find(['organic']), awards:find(['award','medal']), region:find(['region']), sub:find(['sub-region','subregion','sub region']), licence:find(['off-licence','off licence','off-license','licence number','license number','licence','license']) };
       // canonical lists — snap dropdown fields to correct spelling/case on import
       const L_VAR=['Sparkling','Sauvignon Blanc','Riesling','Pinot Gris','Gewürztraminer','Albariño','Viognier','Chardonnay','Chenin Blanc','Semillon','White Blend','Rosé','Pinot Noir','Syrah','Merlot','Cabernet Sauvignon','Malbec','Tempranillo','Red Blend','Dessert','Fortified','Other'];
       const L_COL=['Red','White','Rosé','Sparkling','Dessert','Fortified'];
@@ -357,7 +362,7 @@
         if(isExample(name)){ skipped++; return null; }
         const tn=trim25(at(c,ci.notes)); if(tn.cut)trimmedN++;
         const pair=at(c,ci.pairings).split(';').map(s=>s.trim()).filter(Boolean).slice(0,3);
-        return { name, variety:snap(at(c,ci.variety),L_VAR), colour:snap(at(c,ci.colour),L_COL), vintage:at(c,ci.vintage), price:at(c,ci.price), stock:at(c,ci.stock), notes:tn.text, pairings:pair, style:snap(at(c,ci.style),L_STY), organic:/^y/i.test(at(c,ci.organic)), awards:at(c,ci.awards), region:snap(at(c,ci.region),L_REG), sub:at(c,ci.sub) };
+        return { name, variety:snap(at(c,ci.variety),L_VAR), colour:snap(at(c,ci.colour),L_COL), vintage:at(c,ci.vintage), price:at(c,ci.price), stock:at(c,ci.stock), notes:tn.text, pairings:pair, style:snap(at(c,ci.style),L_STY), organic:/^y/i.test(at(c,ci.organic)), awards:at(c,ci.awards), region:snap(at(c,ci.region),L_REG), sub:at(c,ci.sub), licence:at(c,ci.licence) };
       }).filter(Boolean);
       const matched=rows.filter(x=>WINES.some(w=>w.name.toLowerCase()===String(x.name).toLowerCase())).length;
       prev.innerHTML=`<div class="card">
@@ -365,7 +370,7 @@
         <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Wine</th><th>Variety</th><th>Vintage</th><th>Price</th><th>Stock</th><th></th></tr></thead>
         <tbody>${rows.slice(0,12).map(x=>{ const isNew=!WINES.some(w=>w.name.toLowerCase()===String(x.name).toLowerCase()); return `<tr><td style="font-weight:600">${esc(x.name)||'<span style="color:var(--red)">missing</span>'}</td><td>${esc(x.variety)}</td><td class="mono" style="font-size:12px">${esc(x.vintage)}</td><td class="mono" style="font-size:12px">${x.price?'$'+esc(x.price):''}</td><td class="mono" style="font-size:12px">${esc(x.stock)}</td><td>${isNew?'<span class="pill new">New</span>':'<span class="pill in">Update</span>'}</td></tr>`; }).join('')}</tbody></table></div>
         <div class="card-pad" style="display:flex;justify-content:space-between;align-items:center;border-top:1px solid var(--line-soft)">
-          <span style="font-size:12.5px;color:var(--muted)">${rows.length>12?'+ '+(rows.length-12)+' more':'All rows shown'}${trimmedN?' · '+trimmedN+' note'+(trimmedN>1?'s':'')+' shortened to 25 words':''}</span>
+          <span style="font-size:12.5px;color:var(--muted)">${rows.length>12?'+ '+(rows.length-12)+' more':'All rows shown'}${trimmedN?' · '+trimmedN+' note'+(trimmedN>1?'s':'')+' shortened to 25 words':''}${rows.some(x=>x.licence)?' · off-licence number captured':''}</span>
           <button class="btn primary" id="confirm">${ic('check',15)} Confirm &amp; publish ${rows.length} wines</button>
         </div></div>`;
       prev.querySelector('#confirm').addEventListener('click',()=>{ toast('Published · '+rows.length+' wines synced to AIWine 🍷'); prev.innerHTML='<div class="card card-pad" style="text-align:center"><div style="color:var(--green);margin-bottom:6px">'+ic('check',26,'var(--green)')+'</div><div style="font-weight:700">Your range is live</div><div style="font-size:13px;color:var(--ink-soft);margin-top:4px">Customers see the changes now. (Demo — no data was written.)</div></div>'; });
@@ -375,6 +380,19 @@
 
   RENDER.plan = el => {
     const active = PLAN.cellarDoor;
+    const cdFeats = [
+      ['passport','A destination, not just a listing','Your wines stop being anonymous bottles and become a place drinkers can get to know — your story, your people, your patch of dirt.'],
+      ['heart','Story & hero photo','A rich profile with your founding story, winemaker, and a full-bleed photo of the vineyard or cellar door.'],
+      ['grid','Visit & tasting details','Opening hours, location and how to book — so a drinker who scans your wine in a bottle shop can plan a visit.'],
+      ['scan','Passport stamps','When a visitor checks in, they stamp your cellar door in their AIWine Passport — repeat visits, and a reason to come back.'],
+    ];
+    const cdGrid = `<div class="grow-feats" style="margin-top:18px">${cdFeats.map(f=>`<div class="grow-feat"><span class="gf-ic">${ic(f[0],17)}</span><div><div class="gf-t">${f[1]}</div><div class="gf-d">${f[2]}</div></div></div>`).join('')}</div>`;
+    const explainer = `
+      <div class="card card-pad" style="margin-bottom:20px">
+        <div class="label" style="color:var(--brass);margin-bottom:8px">What is a Virtual Cellar Door?</div>
+        <div style="font-size:14px;color:var(--ink-soft);line-height:1.6;max-width:620px">A real cellar door is where people taste your wine and fall for your story. The <b>Virtual Cellar Door</b> brings that to AIWine: a rich, self-managed profile that any drinker who scans or finds your wine can open — your story, a hero photo, where you are and when to visit. It turns a one-off scan into a relationship, and sends real visitors your way. Your wine listings and stock stay <b>free forever</b>; this is the upgrade that makes you a destination.</div>
+        ${cdGrid}
+      </div>`;
     const gate = `
       <div class="card card-pad">
         <div class="label" style="color:var(--brass);margin-bottom:8px">Virtual Cellar Door \u00b7 $95/yr</div>
@@ -396,49 +414,79 @@
           <div class="field"><label>Your story</label><textarea id="cd-story" rows="4" style="width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:var(--card-2);font-family:var(--sans);font-size:14px;resize:vertical" placeholder="Tell visitors who you are\u2026">${esc(PLAN.story||'')}</textarea></div>
           <div class="field"><label>Visit / tasting hours</label><input id="cd-hours" value="${esc(PLAN.hours||'')}" placeholder="Fri\u2013Sun \u00b7 11am\u20134pm" style="width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:var(--card-2);font-size:14px"></div>
           <div class="field"><label>Hero photo</label><div style="border:2px dashed var(--line);border-radius:8px;padding:22px;text-align:center;color:var(--muted);font-size:13px">Drag a photo here (demo) \u2014 shown on your public profile</div></div>
+          <div style="padding-top:14px;border-top:1px solid var(--line-soft)"><div class="label" style="color:var(--brass);margin-bottom:5px">Licence &amp; compliance</div><div style="font-size:12.5px;color:var(--ink-soft);line-height:1.55">Shown on every wine listing and here on your cellar-door page. AIWine is your sales agent \u2014 you remain the licensed seller and supplier under your own off-licence.</div></div>
+          <div class="field"><label>Off-licence number</label><input id="cd-lnum" value="${esc(PLAN.licNumber||'')}" placeholder="e.g. 12/OFF/0356/2024" style="width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:var(--card-2);font-size:14px"></div>
+          <div class="grid-2"><div class="field"><label>Expiry date</label><input id="cd-lexp" value="${esc(PLAN.licExpiry||'')}" placeholder="e.g. 14 March 2027" style="width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:var(--card-2);font-size:14px"></div><div class="field"><label>Issuing authority</label><input id="cd-lauth" value="${esc(PLAN.licAuthority||'')}" placeholder="e.g. South Wairarapa District Council" style="width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:var(--card-2);font-size:14px"></div></div>
+          <div class="field"><label>Licensed premises / address</label><input id="cd-laddr" value="${esc(PLAN.licAddress||'')}" placeholder="e.g. Arapai Vineyard, Martinborough" style="width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:var(--card-2);font-size:14px"></div>
+          <div class="field"><label>Certificate <span style="color:var(--muted);font-weight:400">(PDF or image \u2014 ${PLAN.licCert?'on file':'shown to customers'})</span></label><input id="cd-lcert" type="file" accept=".pdf,image/*" style="font-size:13px"></div>
           <div style="display:flex;justify-content:flex-end"><button class="btn primary" id="cd-save">Save \u2014 publish to my profile</button></div>
         </div>
       </div>`;
     el.innerHTML = `
       <div class="page-head"><div><div class="eyebrow">Your plan</div><h1 class="page-title">Plans &amp; <em>cellar door</em>.</h1>
       <div class="sub-line">Free portal &amp; wine uploads for everyone. Upgrade for a virtual cellar door and growth tools.</div></div></div>
+      ${active ? '' : explainer}
       ${active ? editor : gate}
-      <div class="card card-pad" style="margin-top:20px;display:flex;align-items:center;gap:18px;flex-wrap:wrap">
-        <div style="flex:1;min-width:240px"><div class="card-title" style="margin-bottom:4px">Grow \u2014 insights &amp; integrations</div>
-        <div style="font-size:13px;color:var(--ink-soft)">Scan insights, demand signals and API/EPOS sync. <b>$95/yr.</b></div></div>
-        ${PLAN.grow?'<span class="pill in">Active</span>':'<button class="btn primary" id="grow-buy">Unlock Grow \u00b7 $95/yr</button>'}
+      <div class="card card-pad" style="margin-top:20px">
+        <div style="display:flex;align-items:flex-start;gap:18px;flex-wrap:wrap;margin-bottom:18px">
+          <div style="flex:1;min-width:240px"><div class="card-title" style="margin-bottom:4px">Grow — the intelligence layer</div>
+          <div style="font-size:13px;color:var(--ink-soft);line-height:1.5">See how drinkers find and choose your wines across AIWine, and act on it. <b>$95/yr</b> — your portal &amp; uploads stay free.</div></div>
+          ${PLAN.grow?'<span class="pill in">Active</span>':'<button class="btn primary" id="grow-buy">Unlock Grow · $95/yr</button>'}
+        </div>
+        <div class="grow-feats">${growFeatures()}</div>
       </div>`;
     if(!active){
       el.querySelector('#act-code').addEventListener('click',()=>{ const c=(el.querySelector('#code').value||'').trim().toUpperCase(); const hit=CODES[c]; if(!hit){ toast('That code isn\u2019t valid'); return; } activate(hit.label, hit.price); });
       el.querySelectorAll('[data-pay]').forEach(b=>b.addEventListener('click',()=>demoCheckout(+b.dataset.pay)));
     } else {
-      el.querySelector('#cd-save').addEventListener('click',()=>{ PLAN.story=el.querySelector('#cd-story').value; PLAN.hours=el.querySelector('#cd-hours').value; savePlan(); toast('Cellar door updated \u00b7 live on your profile'); });
+      el.querySelector('#cd-save').addEventListener('click', async ()=>{ PLAN.story=el.querySelector('#cd-story').value; PLAN.hours=el.querySelector('#cd-hours').value; PLAN.licNumber=el.querySelector('#cd-lnum').value.trim(); PLAN.licExpiry=el.querySelector('#cd-lexp').value.trim(); PLAN.licAuthority=el.querySelector('#cd-lauth').value.trim(); PLAN.licAddress=el.querySelector('#cd-laddr').value.trim(); const cf=el.querySelector('#cd-lcert'); if(cf&&cf.files&&cf.files[0]) PLAN.licCert=cf.files[0].name; savePlan(); if(PStore.mode==='live'){ try{ if(PStore.updateLicence) await PStore.updateLicence({number:PLAN.licNumber,expiry:PLAN.licExpiry,authority:PLAN.licAuthority,address:PLAN.licAddress}); if(cf&&cf.files&&cf.files[0]&&PStore.uploadLicenceCert) await PStore.uploadLicenceCert(cf.files[0]); }catch(e){ toast('Saved \u2014 certificate upload failed, try again'); } } toast('Cellar door updated \u00b7 live on your profile'); });
     }
     const gb=el.querySelector('#grow-buy'); if(gb) gb.addEventListener('click',()=>demoCheckout(95,'grow'));
   };
 
   RENDER.app = el => {
     const on = PLAN.grow;
+    const feats = [
+      ['scan','Live scans as they happen','A running feed of every time someone scans one of your wines — where they are and which bottle — so you can feel demand in real time.'],
+      ['bottle','Stock from anywhere','Mark a wine low or sold out from the cellar door, a tasting or the tractor. It syncs to AIWine and the portal instantly.'],
+      ['chart','Insights in your pocket','The same regional & national demand signals as the portal, on your phone — spot what your region is asking for before the next vintage.'],
+      ['passport','Cellar-door ready','Pull up your live range and prices while you pour, and see when a visitor stamps your cellar door in their Passport.'],
+    ];
+    const featGrid = `<div class="grow-feats" style="margin-top:18px">${feats.map(f=>`<div class="grow-feat"><span class="gf-ic">${ic(f[0],17)}</span><div><div class="gf-t">${f[1]}</div><div class="gf-d">${f[2]}</div></div></div>`).join('')}</div>`;
     el.innerHTML = `
       <div class="page-head"><div><div class="eyebrow">In your pocket</div><h1 class="page-title">Winery <em>app</em>.</h1>
-      <div class="sub-line">Manage stock and watch live scans from your phone — same login, same data.</div></div></div>
-      ${on ? `
-        <div class="card card-pad" style="display:flex;align-items:center;gap:18px;flex-wrap:wrap">
-          <div style="flex:1;min-width:240px"><div class="card-title" style="margin-bottom:4px">Your winery app is unlocked <span class="pill in">Grow</span></div>
-          <div style="font-size:13px;color:var(--ink-soft)">Install it on your phone — live scans, stock from the tractor, and regional &amp; national insights.</div></div>
-          <button class="btn primary" id="app-open">${ic('sparkle',15)} Download the winery app</button>
+      <div class="sub-line">Everything in this portal, on your phone — live scans, stock and insights, with the same login and data.</div></div></div>
+
+      <div class="card card-pad">
+        <div style="display:flex;align-items:flex-start;gap:18px;flex-wrap:wrap">
+          <div style="flex:1;min-width:240px">
+            <div style="display:flex;align-items:center;gap:9px;margin-bottom:6px"><span class="card-title">The AIWine Winery app</span>${on?'<span class="pill in">Included with Grow</span>':'<span class="pill low">Part of Grow</span>'}</div>
+            <div style="font-size:13.5px;color:var(--ink-soft);line-height:1.55;max-width:560px">A companion to this portal for when you're away from the desk — at the cellar door, a tasting, or out in the vines. No app store needed: it installs straight to your home screen and opens full-screen like a normal app.</div>
+          </div>
+          ${on
+            ? `<button class="btn primary" id="app-open">${ic('sparkle',15)} Download the app</button>`
+            : `<button class="btn primary" id="app-grow">Unlock with Grow · $95/yr</button>`}
         </div>
+        ${featGrid}
+      </div>
+
+      ${on ? `
         <div class="card card-pad" style="margin-top:16px">
-          <div class="label" style="margin-bottom:10px">How to install</div>
-          <div style="font-size:13.5px;color:var(--ink-soft);line-height:1.6">Open the link on your phone, then choose <b>Add to Home Screen</b> — it installs like a normal app, icon and all. Same login as this portal.</div>
-        </div>` : `
-        <div class="card card-pad" style="text-align:center;padding:48px 24px">
-          <div style="font-family:var(--serif);font-size:26px;margin-bottom:8px">The winery app is part of <span style="color:var(--claret)">Grow</span></div>
-          <div style="font-size:13.5px;color:var(--ink-soft);max-width:480px;margin:0 auto 18px">Grow ($95/yr) unlocks the winery app — live scans and stock on your phone, plus regional &amp; national insights. Your own data stays free here in the portal.</div>
-          <button class="btn primary" id="app-grow">See plans</button>
+          <div class="label" style="margin-bottom:10px">How to install (1 minute)</div>
+          <ol style="margin:0;padding-left:18px;font-size:13.5px;color:var(--ink-soft);line-height:1.7">
+            <li>On your phone, tap <b>Download the app</b> above (or open this portal's address on the phone).</li>
+            <li>In your browser's share menu, choose <b>Add to Home Screen</b>.</li>
+            <li>Open it from the new icon and sign in with your winery login — same account, same data.</li>
+          </ol>
+        </div>`
+        : `
+        <div class="card card-pad" style="margin-top:16px;text-align:center;padding:34px 24px">
+          <div style="font-family:var(--serif);font-size:22px;margin-bottom:6px">The winery app is part of <span style="color:var(--claret)">Grow</span></div>
+          <div style="font-size:13.5px;color:var(--ink-soft);max-width:480px;margin:0 auto 16px">Grow ($95/yr) unlocks the app, plus regional & national insights and integrations. Your own data and uploads stay free here in the portal.</div>
+          <button class="btn primary" id="app-grow2">See plans · $95/yr</button>
         </div>`}`;
-    const o=el.querySelector('#app-open'); if(o) o.addEventListener('click',()=>window.open('../apps/winery/index.html','_blank'));
-    const g=el.querySelector('#app-grow'); if(g) g.addEventListener('click',()=>go('plan'));
+    const o=el.querySelector('#app-open'); if(o) o.addEventListener('click',()=>window.open(WINERY_APP,'_blank'));
+    el.querySelectorAll('#app-grow,#app-grow2').forEach(g=>g.addEventListener('click',()=>go('plan')));
   };
 
   RENDER.insights = el => {
@@ -491,7 +539,7 @@
         <button class="btn primary" id="open-app">${ic('passport',15)} Open the winery app</button>
       </div>`;
     el.querySelectorAll('[data-go]').forEach(b=>b.addEventListener('click',()=>go(b.dataset.go)));
-    el.querySelector('#open-app').addEventListener('click',()=>window.open('../apps/winery/index.html','_blank'));
+    el.querySelector('#open-app').addEventListener('click',()=>window.open(WINERY_APP,'_blank'));
   };
   function intCard(icon,title,status,pill,body,cta,goId,href){
     const action = href?`<a class="btn" href="${href}" style="justify-content:center">${cta} ↗</a>`:`<button class="btn ${goId==='wines'||goId==='upload'?'primary':''}" data-go="${goId}" style="justify-content:center">${cta}</button>`;
@@ -555,6 +603,7 @@
           ${err?`<div style="color:var(--red);font-size:12.5px;margin-bottom:12px">${esc(err)}</div>`:''}
           <button class="btn primary" type="submit" style="width:100%;justify-content:center">Sign in</button>
           <button type="button" id="lf-forgot" style="display:block;width:100%;text-align:center;margin-top:14px;background:none;border:none;color:var(--brass);font-size:12.5px;cursor:pointer;text-decoration:underline;text-underline-offset:3px">Forgot password?</button>
+          <div style="text-align:center;margin-top:16px;padding-top:16px;border-top:1px solid var(--line);font-size:12.5px;color:var(--ink-soft)">New to AIWine? <button type="button" id="lf-signup" style="background:none;border:none;color:var(--claret);font-weight:600;cursor:pointer;font-size:12.5px">Create a winery account</button></div>
         </form>
         <div id="toast"></div>
       </div>`;
@@ -564,6 +613,58 @@
       catch(ex){ renderLogin(ex.message); }
     });
     document.getElementById('lf-forgot').addEventListener('click', ()=>renderReset());
+    document.getElementById('lf-signup').addEventListener('click', ()=>renderSignup());
+  }
+
+  function renderSignup(err){
+    document.getElementById('app').innerHTML = authWrap(`
+      <form id="sf" style="width:min(380px,90vw);background:var(--card);border:1px solid var(--line);border-radius:14px;padding:30px 28px;box-shadow:0 30px 80px rgba(0,0,0,.4)">
+        <div class="wordmark" style="color:var(--ink);font-size:20px;margin-bottom:4px">AI<span class="dot" style="background:var(--claret)"></span>Wine<span class="sfx" style="color:var(--brass)">Partner</span></div>
+        <div style="font-family:var(--serif);font-size:25px;font-weight:600;margin:10px 0 4px">Create a winery account</div>
+        <div style="font-size:12.5px;color:var(--ink-soft);line-height:1.5;margin-bottom:18px">List your wines on AIWine. Free to join &mdash; upload your range and manage stock &amp; prices anytime.</div>
+        <div class="field" style="margin-bottom:11px"><label>Winery name</label><input id="sw" type="text" placeholder="e.g. Ata Rangi" autofocus></div>
+        <div class="field" style="margin-bottom:11px"><label>Region</label><input id="sr" type="text" placeholder="e.g. Martinborough"></div>
+        <div class="field" style="margin-bottom:11px"><label>Email</label><input id="se" type="email" placeholder="you@winery.co.nz"></div>
+        <div class="field" style="margin-bottom:14px"><label>Password</label><input id="sp" type="password" placeholder="At least 6 characters"></div>
+        <div style="margin:2px 0 12px;padding-top:14px;border-top:1px solid var(--line)">
+          <div style="font-family:var(--mono);font-size:10px;letter-spacing:0.14em;text-transform:uppercase;color:var(--brass);margin-bottom:5px">Your off-licence</div>
+          <div style="font-size:11.5px;color:var(--ink-soft);line-height:1.5">You sell as the licensed winery &mdash; AIWine is your agent. Your off-licence number shows on every wine listing; a copy of the certificate appears on your cellar-door page.</div>
+        </div>
+        <div class="field" style="margin-bottom:11px"><label>Off-licence number</label><input id="sln" type="text" placeholder="e.g. 12/OFF/0356/2024"></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:11px">
+          <div class="field"><label>Expiry date</label><input id="slx" type="text" placeholder="e.g. 14 Mar 2027"></div>
+          <div class="field"><label>Issuing council</label><input id="sla" type="text" placeholder="e.g. South Wairarapa DC"></div>
+        </div>
+        <div class="field" style="margin-bottom:14px"><label>Certificate <span style="color:var(--muted);font-weight:400">(PDF or image)</span></label><input id="slc" type="file" accept=".pdf,image/*" style="font-size:12px"></div>
+        ${err?`<div style="color:var(--red);font-size:12.5px;margin-bottom:12px">${esc(err)}</div>`:''}
+        <button class="btn primary" type="submit" style="width:100%;justify-content:center">Create account</button>
+        <div style="text-align:center;margin-top:14px;font-size:12.5px;color:var(--ink-soft)">Already registered? <button type="button" id="sf-back" style="background:none;border:none;color:var(--claret);font-weight:600;cursor:pointer;font-size:12.5px">Sign in</button></div>
+      </form>`);
+    document.getElementById('sf-back').addEventListener('click', ()=>renderLogin());
+    document.getElementById('sf').addEventListener('submit', async e=>{
+      e.preventDefault();
+      const btn = e.target.querySelector('button[type=submit]');
+      try {
+        btn.disabled = true; btn.textContent = 'Creating…';
+        const r = await PStore.signUp(
+          document.getElementById('sw').value, document.getElementById('sr').value,
+          document.getElementById('se').value, document.getElementById('sp').value,
+          { number: document.getElementById('sln').value, expiry: document.getElementById('slx').value, authority: document.getElementById('sla').value });
+        if (r.session) {
+          try { var _cf = document.getElementById('slc'); if (_cf && _cf.files && _cf.files[0] && PStore.uploadLicenceCert) await PStore.uploadLicenceCert(_cf.files[0]); } catch (e2) {}
+          boot();
+        }
+        else {
+          document.getElementById('app').innerHTML = authWrap(`
+            <div style="width:min(380px,90vw);background:var(--card);border:1px solid var(--line);border-radius:14px;padding:34px 28px;text-align:center;box-shadow:0 30px 80px rgba(0,0,0,.4)">
+              <div style="font-family:var(--serif);font-size:24px;font-weight:600;margin-bottom:8px">Check your inbox</div>
+              <div style="font-size:13px;color:var(--ink-soft);line-height:1.55;margin-bottom:18px">We&rsquo;ve sent a confirmation link to verify your email. Click it, then sign in to start uploading your wines.</div>
+              <button class="btn primary" id="cf-back" style="width:100%;justify-content:center">Back to sign in</button>
+            </div>`);
+          document.getElementById('cf-back').addEventListener('click', ()=>renderLogin());
+        }
+      } catch(ex){ btn.disabled = false; btn.textContent = 'Create account'; renderSignup(ex.message); }
+    });
   }
 
   function authWrap(inner){
