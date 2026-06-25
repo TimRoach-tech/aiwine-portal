@@ -6,7 +6,11 @@
    and always mutate the in-memory arrays so the UI updates instantly. */
 (function () {
   const CFG = window.PORTAL_CONFIG || {};
-  const LIVE = !!(CFG.SUPABASE_URL && CFG.SUPABASE_ANON_KEY);
+  // DEMO override: open the portal with ?demo=1 (or ?demo) to run on sample data
+  // with NO Supabase — the login accepts any email/password. For presentations.
+  const FORCE_DEMO = (() => { try { return new URLSearchParams(location.search).has('demo'); } catch(e){ return false; } })();
+  const LIVE = !FORCE_DEMO && !!(CFG.SUPABASE_URL && CFG.SUPABASE_ANON_KEY);
+  let demoAuthed = false;
 
   // ---------- demo seed (Ata Rangi, Martinborough) ----------
   const DEMO_WINES = [
@@ -38,6 +42,8 @@
     // ---- boot: load Supabase lib + restore session (live) or seed (demo) ----
     async init() {
       if (!LIVE) {
+        // In ?demo mode, gate behind the login first so the demo shows a real sign-in.
+        if (FORCE_DEMO && !demoAuthed) return { ok: false, needsAuth: true };
         Store.wines = DEMO_WINES.map(w => ({ ...w }));
         Store.orders = DEMO_ORDERS.map(o => ({ ...o }));
         return { ok: true, demo: true };
@@ -52,6 +58,13 @@
       return { ok: true };
     },
     async signIn(email, password) {
+      if (!LIVE) {                       // demo: accept any credentials
+        if (!(email || '').trim()) throw new Error('Enter any email to continue.');
+        demoAuthed = true;
+        Store.wines = DEMO_WINES.map(w => ({ ...w }));
+        Store.orders = DEMO_ORDERS.map(o => ({ ...o }));
+        return true;
+      }
       const { data, error } = await sb.auth.signInWithPassword({ email, password });
       if (error) throw new Error(error.message);
       session = data.session;
@@ -84,7 +97,7 @@
       }
       return { ok: true, session: false };   // needs to confirm email first
     },
-    async signOut() { if (sb) await sb.auth.signOut(); session = null; },
+    async signOut() { demoAuthed = false; if (sb) await sb.auth.signOut(); session = null; },
 
     async resendConfirmation(email) {
       if (!LIVE) throw new Error('Available on the live portal.');

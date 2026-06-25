@@ -723,6 +723,7 @@
           ${friendly?`<div style="color:var(--red);font-size:12.5px;margin-bottom:12px;line-height:1.5">${esc(friendly)}</div>`:''}
           ${needsConfirm?`<button type="button" id="lf-resend" class="btn" style="width:100%;justify-content:center;margin-bottom:12px">Resend confirmation email</button>`:''}
           <button class="btn primary" type="submit" style="width:100%;justify-content:center">Sign in</button>
+          ${PStore.mode==='demo'?`<div style="margin-top:12px;text-align:center;font-family:var(--mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--brass)">Demo mode · any email &amp; password works</div>`:''}
           <button type="button" id="lf-forgot" style="display:block;width:100%;text-align:center;margin-top:14px;background:none;border:none;color:var(--brass);font-size:12.5px;cursor:pointer;text-decoration:underline;text-underline-offset:3px">Forgot password?</button>
           <div style="text-align:center;margin-top:16px;padding-top:16px;border-top:1px solid var(--line);font-size:12.5px;color:var(--ink-soft)">New to AIWine? <button type="button" id="lf-signup" style="background:none;border:none;color:var(--claret);font-weight:600;cursor:pointer;font-size:12.5px">Create a winery account</button></div>
         </form>
