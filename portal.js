@@ -69,7 +69,27 @@
   const esc = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
   const money = n => '$'+Number(n).toLocaleString('en-NZ');
   const toast = m => { const t=$('#toast'); t.textContent=m; t.classList.add('show'); clearTimeout(t._t); t._t=setTimeout(()=>t.classList.remove('show'),2200); };
-  const bottleEl = w => `<span class="bottle" style="background:linear-gradient(160deg,${TINT[w.variety]||'#5C1B27'},#1B1410)"></span>`;
+  // Wine thumbnail — a real photo when the winery has uploaded one, else the variety bottle glyph.
+  const bottleEl = w => w && w.image
+    ? `<span class="wine-thumb" style="background-image:url('${w.image}')"></span>`
+    : `<span class="bottle" style="background:linear-gradient(160deg,${TINT[w.variety]||'#5C1B27'},#1B1410)"></span>`;
+  // Read an image file and downscale to a sensible max edge → JPEG data URL (keeps storage light).
+  function readImageScaled(file, max=900){
+    return new Promise((res,rej)=>{
+      if(!file || !/^image\//.test(file.type)) return rej(new Error('Not an image'));
+      const fr=new FileReader();
+      fr.onload=()=>{ const img=new Image(); img.onload=()=>{
+        let {width:iw,height:ih}=img; const sc=Math.min(1,max/Math.max(iw,ih));
+        const cw=Math.round(iw*sc), ch=Math.round(ih*sc);
+        const cv=document.createElement('canvas'); cv.width=cw; cv.height=ch;
+        cv.getContext('2d').drawImage(img,0,0,cw,ch);
+        res(cv.toDataURL('image/jpeg',0.82));
+      }; img.onerror=rej; img.src=fr.result; };
+      fr.onerror=rej; fr.readAsDataURL(file);
+    });
+  }
+  // Loose key for matching a photo filename to a wine name ("Crimson Pinot 2023.jpg" → "crimsonpinot").
+  const matchKey = s => String(s||'').toLowerCase().replace(/\.[a-z0-9]+$/,'').replace(/[^a-z0-9]+/g,'');
   const stockPill = s => `<span class="pill ${s}">${s==='in'?'In stock':s==='low'?'Low':'Out'}</span>`;
   const stkOf = w => w.qty<=0?'out':w.qty<=8?'low':'in';
 
@@ -250,7 +270,7 @@
   };
   function wineRow(w){
     return `<tr data-wid="${w.id}">
-      <td><div class="wine-cell">${bottleEl(w)}<div><div class="wine-nm">${esc(w.name)}</div><div class="wine-meta">${w.variety} · ${w.vintage}</div></div></div></td>
+      <td><div class="wine-cell"><button class="thumb-btn" data-photo title="${w.image?'Replace photo':'Add a photo'}">${bottleEl(w)}<span class="thumb-cam">${ic('image',12)}</span></button><input type="file" accept="image/*" data-photofile hidden><div><div class="wine-nm">${esc(w.name)}</div><div class="wine-meta">${w.variety} · ${w.vintage}</div></div></div></td>
       <td><span class="price-edit"><span>$</span><input type="number" min="0" value="${w.price}" data-price></span></td>
       <td><span class="stepper"><button data-dec>−</button><input type="number" min="0" value="${w.qty}" data-qty><button data-inc>+</button></span></td>
       <td data-stock>${stockPill(stkOf(w))}</td>
@@ -269,6 +289,9 @@
       const pa=tr.querySelector('[data-price]');
       pa.addEventListener('change',()=>{ w.price=Math.max(0,+pa.value||0); PStore.updateWine(w.id,{price:w.price}); pa.value=w.price; toast('Price updated · '+w.name); });
       tr.querySelector('[data-del]').addEventListener('click',()=>{ if(confirm('Remove '+w.name+' from your range?')){ PStore.removeWine(id); WINES=PStore.wines; go('wines'); toast('Removed'); } });
+      const pf=tr.querySelector('[data-photofile]'), pbtn=tr.querySelector('[data-photo]');
+      pbtn.addEventListener('click',()=>pf.click());
+      pf.addEventListener('change',async e=>{ const f=e.target.files[0]; if(!f) return; try{ const url=await readImageScaled(f); w.image=url; PStore.updateWine(w.id,{image:url}); pbtn.innerHTML=bottleEl(w)+'<span class="thumb-cam">'+ic('image',12)+'</span>'; pbtn.title='Replace photo'; toast('Photo added · '+w.name); }catch(err){ toast('Could not read that image'); } pf.value=''; });
     });
   }
 
@@ -331,6 +354,7 @@
             <div>${ic('check',14,'var(--green)')} Dropdowns keep variety, colour &amp; region spelt consistently.</div>
             <div>${ic('check',14,'var(--green)')} One row per wine — delete the grey example rows (they're skipped anyway).</div>
             <div>${ic('check',14,'var(--green)')} Tasting notes are kept to ~25 words so cards stay tidy.</div>
+            <div>${ic('image',14,'var(--brass)')} Add a <b>photo</b> per wine — name each file after the wine (or fill the <b>image</b> column) and we match it automatically. It shows everywhere your wine appears.</div>
             <div>${ic('check',14,'var(--green)')} Nothing changes until you review the preview and confirm.</div>
           </div>
           <div style="font-size:11.5px;color:var(--muted);margin-top:14px">Own spreadsheet? We'll still try to match it — but the template is far more reliable.</div>
@@ -338,7 +362,7 @@
       </div>`;
     const drop=el.querySelector('#drop'), file=el.querySelector('#file');
     el.querySelector('#pick').addEventListener('click',()=>file.click());
-    el.querySelector('#tmpl').addEventListener('click',()=>{ const csv='wine name,variety,colour,vintage,price (incl GST),stock,style,organic (Y/N),region,sub-region,tasting notes (max 25 words),food pairings (semicolon ;),awards (semicolon ;)\nCrimson Pinot Noir,Pinot Noir,Red,2023,32,60,medium-bodied,N,Wairarapa,Martinborough,"Bright cherry, plum and soft spice \u2014 an easy, food-friendly red.",roast duck;mushroom risotto;pizza,Gold \u00b7 NZ IWS 2025\n'; const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'})); a.download='AIWine_range_template.csv'; a.click(); toast('Template downloaded'); });
+    el.querySelector('#tmpl').addEventListener('click',()=>{ const csv='wine name,variety,colour,vintage,price (incl GST),stock,style,organic (Y/N),region,sub-region,tasting notes (max 25 words),food pairings (semicolon ;),awards (semicolon ;),image (file name)\nCrimson Pinot Noir,Pinot Noir,Red,2023,32,60,medium-bodied,N,Wairarapa,Martinborough,"Bright cherry, plum and soft spice \u2014 an easy, food-friendly red.",roast duck;mushroom risotto;pizza,Gold \u00b7 NZ IWS 2025,Crimson Pinot Noir.jpg\n'; const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'})); a.download='AIWine_range_template.csv'; a.click(); toast('Template downloaded'); });
     file.addEventListener('change',e=>{ if(e.target.files[0]) parseFile(e.target.files[0], el); });
     ['dragenter','dragover'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add('over');}));
     ['dragleave','drop'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove('over');}));
@@ -357,7 +381,7 @@
       const cells=lines.map(l=>l.split(',').map(c=>c.trim().replace(/^"|"$/g,'')));
       const head=cells[0].map(h=>h.toLowerCase());
       const find=keys=>head.findIndex(h=>keys.some(k=>h.includes(k)));
-      const ci={ name:find(['wine name','name','wine']), variety:find(['variet','grape']), colour:find(['colour','color','type']), vintage:find(['vintage','year']), price:find(['price','rrp','cost']), stock:find(['stock','qty','quantity','cellar']), notes:find(['tasting','notes','descrip']), pairings:find(['pairing','food','match']), style:find(['style','body']), organic:find(['organic']), awards:find(['award','medal']), region:find(['region']), sub:find(['sub-region','subregion','sub region']) };
+      const ci={ name:find(['wine name','name','wine']), variety:find(['variet','grape']), colour:find(['colour','color','type']), vintage:find(['vintage','year']), price:find(['price','rrp','cost']), stock:find(['stock','qty','quantity','cellar']), notes:find(['tasting','notes','descrip']), pairings:find(['pairing','food','match']), style:find(['style','body']), organic:find(['organic']), awards:find(['award','medal']), region:find(['region']), sub:find(['sub-region','subregion','sub region']), image:find(['image','photo','picture','bottle shot','label']) };
       // canonical lists — snap dropdown fields to correct spelling/case on import
       const L_VAR=['Sparkling','Sauvignon Blanc','Riesling','Pinot Gris','Gewürztraminer','Albariño','Viognier','Chardonnay','Chenin Blanc','Semillon','White Blend','Rosé','Pinot Noir','Syrah','Merlot','Cabernet Sauvignon','Malbec','Tempranillo','Red Blend','Dessert','Fortified','Other'];
       const L_COL=['Red','White','Rosé','Sparkling','Dessert','Fortified'];
@@ -374,18 +398,42 @@
         if(isExample(name)){ skipped++; return null; }
         const tn=trim25(at(c,ci.notes)); if(tn.cut)trimmedN++;
         const pair=at(c,ci.pairings).split(';').map(s=>s.trim()).filter(Boolean).slice(0,3);
-        return { name, variety:snap(at(c,ci.variety),L_VAR), colour:snap(at(c,ci.colour),L_COL), vintage:at(c,ci.vintage), price:at(c,ci.price), stock:at(c,ci.stock), notes:tn.text, pairings:pair, style:snap(at(c,ci.style),L_STY), organic:/^y/i.test(at(c,ci.organic)), awards:at(c,ci.awards), region:snap(at(c,ci.region),L_REG), sub:at(c,ci.sub) };
+        return { name, variety:snap(at(c,ci.variety),L_VAR), colour:snap(at(c,ci.colour),L_COL), vintage:at(c,ci.vintage), price:at(c,ci.price), stock:at(c,ci.stock), notes:tn.text, pairings:pair, style:snap(at(c,ci.style),L_STY), organic:/^y/i.test(at(c,ci.organic)), awards:at(c,ci.awards), region:snap(at(c,ci.region),L_REG), sub:at(c,ci.sub), imgRef:at(c,ci.image) };
       }).filter(Boolean);
       const matched=rows.filter(x=>WINES.some(w=>w.name.toLowerCase()===String(x.name).toLowerCase())).length;
-      prev.innerHTML=`<div class="card">
-        <div class="card-head"><span class="card-title">Preview · ${rows.length} wines</span><span class="label">${matched} update · ${rows.length-matched} new${skipped?' · '+skipped+' example skipped':''}</span></div>
-        <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Wine</th><th>Variety</th><th>Vintage</th><th>Price</th><th>Stock</th><th></th></tr></thead>
-        <tbody>${rows.slice(0,12).map(x=>{ const isNew=!WINES.some(w=>w.name.toLowerCase()===String(x.name).toLowerCase()); return `<tr><td style="font-weight:600">${esc(x.name)||'<span style="color:var(--red)">missing</span>'}</td><td>${esc(x.variety)}</td><td class="mono" style="font-size:12px">${esc(x.vintage)}</td><td class="mono" style="font-size:12px">${x.price?'$'+esc(x.price):''}</td><td class="mono" style="font-size:12px">${esc(x.stock)}</td><td>${isNew?'<span class="pill new">New</span>':'<span class="pill in">Update</span>'}</td></tr>`; }).join('')}</tbody></table></div>
-        <div class="card-pad" style="display:flex;justify-content:space-between;align-items:center;border-top:1px solid var(--line-soft)">
-          <span style="font-size:12.5px;color:var(--muted)">${rows.length>12?'+ '+(rows.length-12)+' more':'All rows shown'}${trimmedN?' · '+trimmedN+' note'+(trimmedN>1?'s':'')+' shortened to 25 words':''}</span>
-          <button class="btn primary" id="confirm">${ic('check',15)} Confirm &amp; publish ${rows.length} wines</button>
-        </div></div>`;
-      prev.querySelector('#confirm').addEventListener('click',()=>{ toast('Published · '+rows.length+' wines synced to AIWine 🍷'); prev.innerHTML='<div class="card card-pad" style="text-align:center"><div style="color:var(--green);margin-bottom:6px">'+ic('check',26,'var(--green)')+'</div><div style="font-weight:700">Your range is live</div><div style="font-size:13px;color:var(--ink-soft);margin-top:4px">Customers see the changes now. (Demo — no data was written.)</div></div>'; });
+      rows.forEach(x=>{ x.image=null; x._key=matchKey(x.name); x._refKey=x.imgRef?matchKey(x.imgRef):''; });
+      const photos={};   // matchKey(filename) -> dataURL, for this upload session
+      const applyPhotos=()=>rows.forEach(x=>{ if(!x.image){ const k=(x._refKey&&photos[x._refKey])?x._refKey:(photos[x._key]?x._key:''); if(k) x.image=photos[k]; } });
+      const renderPreview=()=>{
+        applyPhotos();
+        const withPhoto=rows.filter(x=>x.image).length, noPhoto=rows.length-withPhoto;
+        prev.innerHTML=`<div class="card">
+          <div class="card-head"><span class="card-title">Preview · ${rows.length} wines</span><span class="label">${matched} update · ${rows.length-matched} new${skipped?' · '+skipped+' example skipped':''}</span></div>
+          <div class="photo-drop" id="pdrop">
+            <span class="pd-ic">${ic('image',20)}</span>
+            <div class="pd-tx"><b>Drop all your wine photos here</b><span>We match each photo to the right wine automatically — name the file after the wine (e.g. <span class="mono">Crimson Pinot Noir.jpg</span>) or fill the <b>image</b> column. <b style="color:${withPhoto?'var(--green)':'var(--amber)'}">${withPhoto} of ${rows.length} matched</b>.</span></div>
+            <button class="btn sm" id="ppick">${ic('upload',14)} Choose photos</button>
+            <input type="file" id="pfiles" accept="image/*" multiple hidden>
+          </div>
+          <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Photo</th><th>Wine</th><th>Variety</th><th>Vintage</th><th>Price</th><th>Stock</th><th></th></tr></thead>
+          <tbody>${rows.slice(0,12).map((x,i)=>{ const isNew=!WINES.some(w=>w.name.toLowerCase()===String(x.name).toLowerCase()); return `<tr>
+            <td><button class="pthumb${x.image?' has':''}" data-prow="${i}" title="${x.image?'Replace photo':'Add a photo'}">${x.image?`<span class="wine-thumb sm" style="background-image:url('${x.image}')"></span>`:`<span class="pthumb-add">${ic('plus',13)}</span>`}</button></td>
+            <td style="font-weight:600">${esc(x.name)||'<span style="color:var(--red)">missing</span>'}</td><td>${esc(x.variety)}</td><td class="mono" style="font-size:12px">${esc(x.vintage)}</td><td class="mono" style="font-size:12px">${x.price?'$'+esc(x.price):''}</td><td class="mono" style="font-size:12px">${esc(x.stock)}</td><td>${isNew?'<span class="pill new">New</span>':'<span class="pill in">Update</span>'}</td></tr>`; }).join('')}</tbody></table></div>
+          <div class="card-pad" style="display:flex;justify-content:space-between;align-items:center;border-top:1px solid var(--line-soft);gap:12px;flex-wrap:wrap">
+            <span style="font-size:12.5px;color:var(--muted)">${rows.length>12?'+ '+(rows.length-12)+' more':'All rows shown'}${noPhoto?' · <b style="color:var(--amber)">'+noPhoto+' still need a photo</b>':' · every wine has a photo ✓'}${trimmedN?' · '+trimmedN+' note'+(trimmedN>1?'s':'')+' shortened':''}</span>
+            <button class="btn primary" id="confirm">${ic('check',15)} Confirm &amp; publish ${rows.length} wines</button>
+          </div></div>`;
+        prev.querySelectorAll('[data-prow]').forEach(b=>b.addEventListener('click',()=>{ const i=+b.dataset.prow; const inp=document.createElement('input'); inp.type='file'; inp.accept='image/*'; inp.onchange=async e=>{ const f=e.target.files[0]; if(!f) return; try{ rows[i].image=await readImageScaled(f); renderPreview(); }catch(err){ toast('Could not read that image'); } }; inp.click(); }));
+        const pdrop=prev.querySelector('#pdrop'), pfiles=prev.querySelector('#pfiles');
+        const ingest=async list=>{ let n=0; for(const f of list){ if(!/^image\//.test(f.type)) continue; try{ photos[matchKey(f.name)]=await readImageScaled(f); n++; }catch(e){} } renderPreview(); if(n) toast(n+' photo'+(n>1?'s':'')+' added'); };
+        prev.querySelector('#ppick').addEventListener('click',()=>pfiles.click());
+        pfiles.addEventListener('change',e=>ingest(e.target.files));
+        ['dragenter','dragover'].forEach(ev=>pdrop.addEventListener(ev,e=>{e.preventDefault();pdrop.classList.add('over');}));
+        ['dragleave','drop'].forEach(ev=>pdrop.addEventListener(ev,e=>{e.preventDefault();pdrop.classList.remove('over');}));
+        pdrop.addEventListener('drop',e=>{ e.preventDefault(); ingest(e.dataTransfer.files); });
+        prev.querySelector('#confirm').addEventListener('click',()=>{ const wp=rows.filter(x=>x.image).length; toast('Published · '+rows.length+' wines synced to AIWine 🍷'); prev.innerHTML='<div class="card card-pad" style="text-align:center"><div style="color:var(--green);margin-bottom:6px">'+ic('check',26,'var(--green)')+'</div><div style="font-weight:700">Your range is live</div><div style="font-size:13px;color:var(--ink-soft);margin-top:4px">'+wp+' of '+rows.length+' wines published with a photo — they now show across the app, shop &amp; cellar-door listing. (Demo — no data was written.)</div></div>'; });
+      };
+      renderPreview();
     };
     r.readAsText(f);
   }
@@ -563,6 +611,9 @@
       <div class="modal-head"><h2>Add a wine</h2><button class="btn-quiet" id="m-x">${ic('x',18)}</button></div>
       <div class="modal-body">
         <div class="field"><label>Wine name</label><input id="f-name" placeholder="e.g. Crimson Pinot Noir" autofocus></div>
+        <div class="field"><label>Photo <span style="color:var(--muted);font-weight:400">(optional — a bottle shot)</span></label>
+          <button type="button" class="photo-field" id="f-photo-btn"><span class="pf-thumb" id="f-photo-thumb"><span class="pthumb-add">${ic('image',18)}</span></span><span class="pf-tx" id="f-photo-tx">Add a photo</span></button>
+          <input type="file" id="f-photo" accept="image/*" hidden></div>
         <div class="grid-2">
           <div class="field"><label>Variety</label><select id="f-var">${VARIETIES.map(v=>`<option>${v}</option>`).join('')}<option>Other</option></select></div>
           <div class="field"><label>Colour / type</label><select id="f-colour"><option>Red</option><option>White</option><option>Rosé</option><option>Sparkling</option><option>Dessert</option><option>Fortified</option></select></div>
@@ -586,12 +637,15 @@
       </div>
       <div class="modal-foot"><button class="btn" id="m-cancel">Cancel</button><button class="btn primary" id="m-save">${ic('plus',15)} Add to my range</button></div>`;
     openModal();
+    let photoUrl=null;
+    $('#f-photo-btn').onclick=()=>$('#f-photo').click();
+    $('#f-photo').onchange=async e=>{ const f=e.target.files[0]; if(!f) return; try{ photoUrl=await readImageScaled(f); $('#f-photo-thumb').innerHTML=`<span class="wine-thumb sm" style="background-image:url('${photoUrl}')"></span>`; $('#f-photo-tx').textContent='Photo added · tap to replace'; }catch(err){ toast('Could not read that image'); } };
     $('#m-x').onclick=closeModal; $('#m-cancel').onclick=closeModal;
     $('#m-save').onclick=()=>{
       const name=$('#f-name').value.trim(); if(!name){ toast('Give the wine a name'); return; }
       const pairs=($('#f-pair').value||'').split(';').map(s=>s.trim()).filter(Boolean).slice(0,3);
       const notes=($('#f-notes').value||'').trim().split(/\s+/).filter(Boolean).slice(0,25).join(' ');
-      const w={ id:Date.now(), name, variety:$('#f-var').value, colour:$('#f-colour').value, style:$('#f-style').value, organic:$('#f-organic').value==='Y', region:$('#f-region').value, subRegion:$('#f-sub').value.trim(), notes, pairings:pairs, awards:($('#f-awards').value||'').trim(), vintage:+$('#f-vin').value||2024, price:+$('#f-price').value||0, qty:+$('#f-qty').value||0, scans:0 };
+      const w={ id:Date.now(), name, variety:$('#f-var').value, colour:$('#f-colour').value, style:$('#f-style').value, organic:$('#f-organic').value==='Y', region:$('#f-region').value, subRegion:$('#f-sub').value.trim(), notes, pairings:pairs, awards:($('#f-awards').value||'').trim(), vintage:+$('#f-vin').value||2024, price:+$('#f-price').value||0, qty:+$('#f-qty').value||0, scans:0, image:photoUrl };
       PStore.addWine(w); closeModal(); go('wines'); toast('Added · '+name+' is live on AIWine 🍷');
     };
   }

@@ -99,6 +99,28 @@ table.tbl{width:100%;border-collapse:collapse;}
 .wine-cell{display:flex;align-items:center;gap:12px;}
 .bottle{width:26px;height:38px;border-radius:3px 3px 4px 4px;flex-shrink:0;position:relative;box-shadow:inset 0 0 0 1px rgba(255,255,255,0.08);}
 .bottle::after{content:"";position:absolute;left:50%;top:6px;transform:translateX(-50%);width:13px;height:16px;background:rgba(244,239,229,0.85);border-radius:1px;}
+/* uploaded wine photo thumbnails */
+.wine-thumb{width:30px;height:42px;border-radius:4px;flex-shrink:0;display:block;background-size:cover;background-position:center;box-shadow:inset 0 0 0 1px rgba(0,0,0,0.12);}
+.wine-thumb.sm{width:42px;height:42px;border-radius:7px;}
+.thumb-btn{position:relative;padding:0;border:none;background:none;cursor:pointer;display:inline-flex;line-height:0;border-radius:4px;}
+.thumb-btn .thumb-cam{position:absolute;right:-4px;bottom:-4px;width:16px;height:16px;border-radius:50%;background:var(--claret);color:#fff;display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity .15s;box-shadow:0 1px 4px rgba(0,0,0,.3);}
+.thumb-btn:hover .thumb-cam{opacity:1;}
+/* upload: photo drop zone */
+.photo-drop{display:flex;align-items:center;gap:14px;padding:14px 18px;margin:0 1px;border-top:1px solid var(--line-soft);border-bottom:1px solid var(--line-soft);background:var(--card-2);}
+.photo-drop.over{background:rgba(169,134,84,0.1);}
+.photo-drop .pd-ic{width:38px;height:38px;flex:none;border-radius:9px;display:flex;align-items:center;justify-content:center;background:var(--bone-alt,#EDE6D8);color:var(--brass);}
+.photo-drop .pd-tx{flex:1;min-width:0;font-size:12px;color:var(--muted);line-height:1.5;}
+.photo-drop .pd-tx b{color:var(--ink);font-weight:600;}
+.photo-drop .pd-tx span{display:block;}
+.pthumb{padding:0;border:none;background:none;cursor:pointer;line-height:0;}
+.pthumb-add{width:42px;height:42px;border-radius:7px;border:1px dashed var(--line);display:flex;align-items:center;justify-content:center;color:var(--faint);background:var(--card-2);}
+.pthumb:hover .pthumb-add{border-color:var(--brass);color:var(--brass);}
+/* add-wine modal: photo field */
+.photo-field{display:flex;align-items:center;gap:12px;width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--card-2);cursor:pointer;text-align:left;}
+.photo-field:hover{border-color:var(--brass);}
+.photo-field .pf-thumb{flex:none;}
+.photo-field .pf-thumb .pthumb-add{border:none;background:var(--bone-alt,#EDE6D8);color:var(--brass);}
+.photo-field .pf-tx{font-size:13px;color:var(--ink-soft);}
 .wine-nm{font-weight:600;font-size:13.5px;}
 .wine-meta{font-family:var(--mono);font-size:10px;letter-spacing:0.06em;color:var(--muted);text-transform:uppercase;margin-top:2px;}
 .stepper{display:inline-flex;align-items:center;border:1px solid var(--line);border-radius:7px;overflow:hidden;background:var(--card-2);}
@@ -149,6 +171,12 @@ table.tbl{width:100%;border-collapse:collapse;}
 
 /* ---------- integrations ---------- */
 .int-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px;}
+.grow-feats{display:grid;grid-template-columns:1fr 1fr;gap:14px 22px;}
+@media(max-width:720px){.grow-feats{grid-template-columns:1fr;}}
+.grow-feat{display:flex;gap:12px;align-items:flex-start;}
+.grow-feat .gf-ic{width:34px;height:34px;border-radius:9px;display:grid;place-items:center;background:var(--bone-alt);color:var(--claret);flex:none;}
+.grow-feat .gf-t{font-weight:700;font-size:13.5px;}
+.grow-feat .gf-d{font-size:12.5px;color:var(--ink-soft);line-height:1.5;margin-top:2px;}
 .int{padding:22px;display:flex;flex-direction:column;gap:10px;}
 .int .ii{width:44px;height:44px;border-radius:12px;display:grid;place-items:center;background:var(--bone-alt);color:var(--claret);}
 .int h3{font-family:var(--serif);font-weight:600;font-size:20px;}

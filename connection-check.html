@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Portal Connection Check · AIWine Winery Portal</title>
+<meta name="robots" content="noindex" />
+<link rel="icon" href="favicon.svg" />
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;1,400&family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+  :root{
+    --bone:#F4EFE5; --bone-alt:#EDE6D8; --card:#FAF6EE;
+    --ink:#1B1410; --ink-soft:#4A3D34; --muted:#8B7E6E; --line:#D8CFBE;
+    --claret:#5C1B27; --claret-deep:#3A0E18; --brass:#A98654;
+    --pass:#2F7D4F; --pass-bg:#E9F1E9; --pass-line:#BCD6BF;
+    --fail:#B23A2E; --fail-bg:#F6E7E4; --fail-line:#E3BDB6;
+    --warn:#B5852A; --warn-bg:#F6EFDD; --warn-line:#E2CE9A;
+    --serif:'Cormorant Garamond',Georgia,serif;
+    --sans:'Manrope',system-ui,sans-serif;
+    --mono:'JetBrains Mono',ui-monospace,monospace;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;}
+  body{background:var(--bone);color:var(--ink);font-family:var(--sans);line-height:1.5;padding:40px 24px 80px;-webkit-font-smoothing:antialiased;}
+  .wrap{max-width:980px;margin:0 auto;}
+
+  /* header */
+  .head{display:flex;justify-content:space-between;align-items:flex-start;gap:24px;flex-wrap:wrap;padding-bottom:22px;border-bottom:1px solid var(--line);}
+  .mark{font-family:var(--sans);font-weight:800;font-size:20px;letter-spacing:0.01em;}
+  .mark .dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--claret);margin:0 2px 1px;}
+  .mark .sfx{font-weight:500;font-size:11px;color:var(--brass);letter-spacing:0.14em;text-transform:uppercase;margin-left:6px;}
+  .eyebrow{font-family:var(--mono);font-size:10px;letter-spacing:0.18em;text-transform:uppercase;color:var(--brass);margin-top:18px;display:flex;align-items:center;gap:9px;}
+  .eyebrow::before{content:"";width:22px;height:1px;background:var(--brass);}
+  .title{font-family:var(--serif);font-size:40px;font-weight:500;line-height:1.04;margin-top:8px;letter-spacing:-0.01em;}
+  .sub{color:var(--ink-soft);font-size:13.5px;max-width:580px;margin-top:8px;}
+  .meta{font-family:var(--mono);font-size:10px;letter-spacing:0.14em;text-transform:uppercase;color:var(--muted);text-align:right;}
+  .meta b{color:var(--ink-soft);}
+
+  /* target line */
+  .target{margin:20px 0 6px;font-family:var(--mono);font-size:11.5px;color:var(--ink-soft);background:var(--bone-alt);border:1px solid var(--line);border-radius:4px;padding:13px 16px;display:flex;gap:10px;align-items:flex-start;flex-wrap:wrap;}
+  .target .tag{flex:none;font-size:9.5px;letter-spacing:0.16em;text-transform:uppercase;color:#fff;background:var(--brass);padding:3px 8px;border-radius:999px;margin-top:1px;}
+  .target code{word-break:break-all;}
+
+  /* banner */
+  .banner{margin:24px 0;border-radius:4px;border:1px solid var(--line);padding:24px 26px;display:flex;align-items:center;gap:22px;flex-wrap:wrap;background:var(--card);}
+  .banner.go{background:var(--pass-bg);border-color:var(--pass-line);}
+  .banner.issues{background:var(--fail-bg);border-color:var(--fail-line);}
+  .banner.warn{background:var(--warn-bg);border-color:var(--warn-line);}
+  .banner.running{background:var(--bone-alt);}
+  .bdot{width:52px;height:52px;border-radius:50%;flex:none;display:flex;align-items:center;justify-content:center;font-size:26px;color:#fff;background:var(--brass);}
+  .go .bdot{background:var(--pass);} .issues .bdot{background:var(--fail);} .warn .bdot{background:var(--warn);}
+  .verdict{font-family:var(--serif);font-size:29px;font-weight:600;line-height:1.05;}
+  .go .verdict{color:var(--pass);} .issues .verdict{color:var(--fail);} .warn .verdict{color:var(--warn);}
+  .bcount{font-size:12.5px;color:var(--ink-soft);margin-top:5px;}
+  .actions{margin-left:auto;display:flex;gap:10px;}
+  .btn{font-family:var(--mono);font-size:12px;letter-spacing:0.1em;text-transform:uppercase;border:1px solid var(--ink);background:var(--ink);color:var(--bone);padding:11px 20px;border-radius:3px;cursor:pointer;transition:opacity .15s;}
+  .btn:hover{opacity:.82;} .btn[disabled]{opacity:.4;cursor:default;}
+
+  /* groups */
+  .groups{display:flex;flex-direction:column;gap:16px;}
+  .group{background:var(--card);border:1px solid var(--line);border-radius:4px;overflow:hidden;}
+  .ghead{display:flex;align-items:center;gap:12px;padding:15px 18px;border-bottom:1px solid var(--line);}
+  .gnum{font-family:var(--mono);font-size:10px;letter-spacing:0.18em;color:var(--brass);}
+  .gname{font-family:var(--serif);font-size:21px;font-weight:600;flex:1;}
+  .gsub{font-size:11px;color:var(--muted);font-family:var(--mono);}
+  .gtally{font-family:var(--mono);font-size:11px;letter-spacing:0.06em;padding:4px 10px;border-radius:999px;border:1px solid var(--line);color:var(--ink-soft);white-space:nowrap;}
+  .gtally.ok{color:var(--pass);border-color:var(--pass-line);background:var(--pass-bg);}
+  .gtally.bad{color:var(--fail);border-color:var(--fail-line);background:var(--fail-bg);}
+  .gtally.warn{color:var(--warn);border-color:var(--warn-line);background:var(--warn-bg);}
+  .checks{list-style:none;}
+  .check{display:flex;gap:12px;padding:13px 18px;border-top:1px solid #ECE4D5;align-items:flex-start;}
+  .check:first-child{border-top:none;}
+  .icn{flex:none;width:19px;height:19px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;color:#fff;margin-top:1px;font-weight:700;background:var(--muted);}
+  .pass .icn{background:var(--pass);} .fail .icn{background:var(--fail);} .warn .icn{background:var(--warn);} .pend .icn{background:var(--muted);}
+  .cbody{flex:1;min-width:0;}
+  .cname{font-size:13px;color:var(--ink);font-weight:600;}
+  .cdetail{font-size:11.5px;color:var(--muted);margin-top:3px;word-break:break-word;font-family:var(--mono);line-height:1.55;}
+  .fail .cdetail{color:var(--fail);} .warn .cdetail{color:var(--warn);}
+
+  .about{margin-top:30px;border-top:1px solid var(--line);padding-top:20px;color:var(--muted);font-size:12px;line-height:1.75;max-width:760px;}
+  .about b{color:var(--ink-soft);} .about code{background:var(--bone-alt);padding:1px 6px;border-radius:3px;color:var(--ink-soft);font-size:11px;font-family:var(--mono);}
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <header class="head">
+      <div>
+        <div class="mark">AI<span class="dot"></span>Wine<span class="sfx">Portal</span></div>
+        <div class="eyebrow">Go-live diagnostic</div>
+        <h1 class="title">Connection Check</h1>
+        <p class="sub">Talks to your real Supabase project using the portal's own anon key and reports two things you couldn't see otherwise: whether the key still works, and which database migrations (<b>01 · 05 · 07</b>) are actually live.</p>
+      </div>
+      <div class="meta"><div>Last run</div><div><b id="stamp">—</b></div></div>
+    </header>
+
+    <div class="target"><span class="tag">Target</span><span>Project&nbsp; <code id="t-url">reading config.js…</code><br>Anon key&nbsp; <code id="t-key">—</code></span></div>
+
+    <div class="banner running" id="banner">
+      <div class="bdot" id="bdot">…</div>
+      <div>
+        <div class="verdict" id="verdict">Running checks…</div>
+        <div class="bcount" id="bcount">Probing connection, schema and auth settings.</div>
+      </div>
+      <div class="actions"><button class="btn" id="rerun" disabled>Re-run</button></div>
+    </div>
+
+    <div class="groups" id="groups"></div>
+
+    <div class="about">
+      <b>What this does &amp; doesn't do.</b> It only ever <i>reads</i> — it never creates a winery, an order, or writes any data. It can't see inside row-level security (that's the point of RLS), so a few checks confirm a table or function <b>exists and is reachable</b> rather than counting rows. The one check that proves your data is safe — signing in as Winery&nbsp;A and confirming you can't see Winery&nbsp;B — still has to be done by hand with two real logins.<br><br>
+      <b>How to read it.</b> Green = live and working. Red = missing or broken (the detail line says what). Amber = couldn't determine automatically — check it manually. The headline banner tells you, in one line, whether the winery sign-in is ready to deploy.
+    </div>
+  </div>
+
+  <template id="__bundler_thumbnail">
+    <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+      <rect width="100" height="100" fill="#F4EFE5"/>
+      <path d="M50 24 C40 24 34 31 34 41 C34 53 44 58 47 64 L53 64 C56 58 66 53 66 41 C66 31 60 24 50 24 Z" fill="none" stroke="#5C1B27" stroke-width="4"/>
+      <line x1="50" y1="64" x2="50" y2="74" stroke="#5C1B27" stroke-width="4"/>
+      <line x1="42" y1="76" x2="58" y2="76" stroke="#5C1B27" stroke-width="4" stroke-linecap="round"/>
+      <circle cx="50" cy="42" r="6" fill="#A98654"/>
+    </svg>
+  </template>
+
+  <script src="config.js"></script>
+  <script>
+  (function () {
+    'use strict';
+    const CFG = window.PORTAL_CONFIG || {};
+    const URL = (CFG.SUPABASE_URL || '').replace(/\/+$/, '');
+    const KEY = CFG.SUPABASE_ANON_KEY || '';
+    const H = { apikey: KEY, Authorization: 'Bearer ' + KEY };
+
+    document.getElementById('t-url').textContent = URL || '(empty — portal is in demo mode)';
+    document.getElementById('t-key').textContent = KEY ? (KEY.slice(0, 14) + '…' + KEY.slice(-6)) : '(none)';
+
+    function esc(s){ return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+    // ---- low-level probes ----------------------------------------------------
+    // Returns { status, ok, json, text, netErr }
+    async function call(method, path, body) {
+      try {
+        const opt = { method, headers: Object.assign({}, H) };
+        if (body !== undefined) { opt.headers['Content-Type'] = 'application/json'; opt.body = JSON.stringify(body); }
+        const r = await fetch(URL + path, opt);
+        let json = null, text = '';
+        try { text = await r.text(); json = text ? JSON.parse(text) : null; } catch (e) {}
+        return { status: r.status, ok: r.ok, json, text };
+      } catch (e) {
+        return { netErr: (e && e.message) || String(e) };
+      }
+    }
+    const rest = (q) => call('GET', '/rest/v1/' + q);
+    const rpc  = (fn, args) => call('POST', '/rest/v1/rpc/' + fn, args || {});
+
+    // Heuristics over PostgREST responses.
+    const isMissing = (res) => res.status === 404 ||
+      (res.json && /could not find|does not exist|schema cache/i.test(res.json.message || ''));
+    const isPermBlocked = (res) => res.status === 401 || res.status === 403 ||
+      (res.json && /permission denied/i.test(res.json.message || ''));
+    // A rotated/wrong anon key gives "Invalid API key" on a normal data endpoint.
+    // (Ignore "Secret API key required" — that's the /rest/v1/ root refusing ANY
+    //  publishable key by design, not a sign the key is bad.)
+    const isBadKey = (res) => (res.json && /invalid (api )?key|jwt (expired|malformed)/i.test((res.json.message || '') + (res.json.msg || '') + (res.json.error || '')));
+
+    // ---- the check groups ----------------------------------------------------
+    const GROUPS = [
+      {
+        id: 'conn', title: 'Connection & key', sub: 'is the project reachable, is the key current',
+        tests: [
+          { name: 'Supabase project is reachable', run: async () => {
+              if (!URL) throw new Error('No SUPABASE_URL in config.js — the portal would run in browser-only demo mode.');
+              const r = await call('GET', '/auth/v1/health');
+              if (r.netErr) throw new Error('Could not reach the project: ' + r.netErr + ' — wrong URL, project paused, or no network.');
+              if (r.status >= 500) throw new Error('Project responded with ' + r.status + ' — it may be paused or down.');
+              return 'reachable · auth service responded ' + r.status;
+          }},
+          { name: 'Anon key is accepted (not rotated)', run: async () => {
+              // Hit a real, anon-readable table (NOT the /rest/v1/ root, which
+              // rejects publishable keys on purpose). 200 = key is live.
+              const r = await rest('wineries?select=id&limit=1');
+              if (r.netErr) throw new Error('Network error: ' + r.netErr);
+              if (isBadKey(r) || r.status === 401) throw new Error('Key REJECTED — it has been rotated or is wrong. Copy the current anon/publishable key from Supabase → Project Settings → API into config.js.');
+              return 'key accepted by the data API — live rows returned (' + r.status + ')';
+          }},
+        ]
+      },
+      {
+        id: 'm01', title: 'Migration 01 — core portal schema', sub: 'winery_users · my_winery() · orders',
+        tests: [
+          { name: 'my_winery() function exists', run: async () => {
+              const r = await rpc('my_winery');
+              if (r.netErr) throw new Error('Network error: ' + r.netErr);
+              if (isMissing(r)) throw new Error('Function not found — migration 01 has NOT been run.');
+              return 'present (returned null because no winery is signed in — expected)';
+          }},
+          { name: 'orders table exists', run: async () => {
+              const r = await rest('orders?select=id&limit=1');
+              if (r.netErr) throw new Error('Network error: ' + r.netErr);
+              if (isMissing(r)) throw new Error('Table not found — migration 01 has NOT been run.');
+              if (isPermBlocked(r)) return 'present (RLS/grant blocks anon reads — correct & expected)';
+              return 'present and reachable';
+          }},
+        ]
+      },
+      {
+        id: 'm05', title: 'Migration 05 — onboarding & public listings', sub: 'self sign-up trigger · anon listing grant',
+        tests: [
+          { name: 'wineries table exists', run: async () => {
+              const r = await rest('wineries?select=id&limit=1');
+              if (r.netErr) throw new Error('Network error: ' + r.netErr);
+              if (isMissing(r)) throw new Error('wineries table not found — the CRM base schema has not been run in this project.');
+              return 'present';
+          }},
+          { name: 'Public listing columns are granted to anon', run: async () => {
+              const r = await rest('wineries?select=id,name,region&limit=1');
+              if (r.netErr) throw new Error('Network error: ' + r.netErr);
+              if (isMissing(r)) throw new Error('wineries table not found.');
+              if (isPermBlocked(r)) throw new Error('anon cannot read name/region — migration 05 column grant NOT applied. Public site/app listings would be blank.');
+              return 'anon can read id/name/region (' + ((r.json && r.json.length) || 0) + ' row sample) — grant is live';
+          }},
+        ]
+      },
+      {
+        id: 'm07', title: 'Migration 07 — multi-site, order email, RPCs', sub: 'the one store.js depends on at login',
+        tests: [
+          { name: 'my_wineries() function exists', run: async () => {
+              const r = await rpc('my_wineries');
+              if (r.netErr) throw new Error('Network error: ' + r.netErr);
+              if (isMissing(r)) throw new Error('Function not found — migration 07 has NOT been run. The portal will load the sign-in screen but BREAK right after login (store.js calls loadSites → isPrimary/my_wineries).');
+              return 'present — multi-site reads available';
+          }},
+          { name: 'place_order() function exists', run: async () => {
+              const r = await rpc('place_order', { p: { shipments: [] } });
+              if (r.netErr) throw new Error('Network error: ' + r.netErr);
+              if (isMissing(r)) throw new Error('Function not found — migration 07 has NOT been run. Consumer checkout cannot create winery orders.');
+              // empty shipments → no orders created, safe no-op
+              const made = r.json && r.json.orders ? r.json.orders.length : 0;
+              return 'present · dry-run created ' + made + ' orders (0 expected — nothing was written)';
+          }},
+        ]
+      },
+      {
+        id: 'auth', title: 'Auth settings', sub: 'sign-up enabled · email confirmation',
+        tests: [
+          { name: 'Sign-up is enabled & confirmation mode', run: async () => {
+              const r = await call('GET', '/auth/v1/settings');
+              if (r.netErr) throw new Error('Network error: ' + r.netErr);
+              if (!r.json) return { warn: true, msg: 'Could not read auth settings (status ' + r.status + ') — verify in Supabase → Authentication: sign-ups ON, email confirmation OFF.' };
+              const j = r.json;
+              const signupOff = j.disable_signup === true;
+              const autoconfirm = (j.mailer_autoconfirm === true) || (j.autoconfirm === true);
+              if (signupOff) throw new Error('Sign-ups are DISABLED — wineries cannot self-onboard. Enable in Authentication → Sign In / Providers.');
+              if (autoconfirm) return 'sign-ups enabled · email auto-confirm ON — new wineries go straight in (matches the portal code)';
+              return { warn: true, msg: 'sign-ups enabled, but email confirmation appears ON. The portal sign-up code expects an immediate session — either turn confirmation OFF, or accept that new wineries must click an email link first.' };
+          }},
+        ]
+      },
+    ];
+
+    // ---- runner --------------------------------------------------------------
+    const groupsEl = document.getElementById('groups');
+    const bannerEl = document.getElementById('banner');
+
+    async function runAll() {
+      const btn = document.getElementById('rerun');
+      btn.disabled = true;
+      bannerEl.className = 'banner running';
+      document.getElementById('bdot').textContent = '…';
+      document.getElementById('verdict').textContent = 'Running checks…';
+      document.getElementById('bcount').textContent = 'Probing connection, schema and auth settings.';
+      groupsEl.innerHTML = '';
+
+      let pass = 0, fail = 0, warn = 0;
+      const results = [];
+      const groupState = {}; // id -> 'ok'|'bad'|'warn'
+
+      for (const g of GROUPS) {
+        const gRes = { id: g.id, title: g.title, sub: g.sub, checks: [] };
+        let gBad = 0, gWarn = 0;
+        for (const t of g.tests) {
+          let state = 'pass', detail = '';
+          try {
+            const out = await t.run();
+            if (out && out.warn) { state = 'warn'; detail = out.msg; warn++; gWarn++; }
+            else { detail = out; pass++; }
+          } catch (e) { state = 'fail'; detail = (e && e.message) || String(e); fail++; gBad++; }
+          gRes.checks.push({ name: t.name, state, detail });
+        }
+        groupState[g.id] = gBad ? 'bad' : (gWarn ? 'warn' : 'ok');
+        results.push(gRes);
+      }
+
+      // render
+      groupsEl.innerHTML = results.map((g, gi) => {
+        const bad = g.checks.filter(c => c.state === 'fail').length;
+        const wn  = g.checks.filter(c => c.state === 'warn').length;
+        const tally = bad ? '<span class="gtally bad">' + bad + ' failing</span>'
+          : wn ? '<span class="gtally warn">' + wn + ' to verify</span>'
+          : '<span class="gtally ok">' + g.checks.length + '/' + g.checks.length + ' OK</span>';
+        const rows = g.checks.map(c => {
+          const icnTxt = c.state === 'pass' ? '✓' : c.state === 'warn' ? '!' : '✗';
+          return '<li class="check ' + c.state + '">' +
+            '<span class="icn">' + icnTxt + '</span>' +
+            '<div class="cbody"><div class="cname">' + esc(c.name) + '</div>' +
+            '<div class="cdetail">' + esc(c.detail) + '</div></div></li>';
+        }).join('');
+        return '<section class="group"><div class="ghead">' +
+          '<span class="gnum">' + String(gi + 1).padStart(2, '0') + '</span>' +
+          '<div style="flex:1"><div class="gname">' + esc(g.title) + '</div><div class="gsub">' + esc(g.sub) + '</div></div>' +
+          tally + '</div><ul class="checks">' + rows + '</ul></section>';
+      }).join('');
+
+      // headline verdict — connection + 01 + 05 + 07 are the go-live gates
+      const gates = ['conn', 'm01', 'm05', 'm07'];
+      const gateBad = gates.some(id => groupState[id] === 'bad');
+      const anyWarn = warn > 0;
+      let cls, dot, verdict, count;
+      if (gateBad) {
+        cls = 'issues'; dot = '✗'; verdict = 'Not ready to deploy';
+        count = fail + ' blocking issue' + (fail === 1 ? '' : 's') + ' — the sign-in won\'t work live until these are fixed.';
+      } else if (anyWarn) {
+        cls = 'warn'; dot = '!'; verdict = 'Ready — with things to verify';
+        count = 'Connection and migrations are live. ' + warn + ' item' + (warn === 1 ? '' : 's') + ' need a manual check (see amber).';
+      } else {
+        cls = 'go'; dot = '✓'; verdict = 'Sign-in is ready to go live';
+        count = 'Key works, migrations 01 / 05 / 07 are all live, auth is configured. Do the two-winery RLS test, then deploy.';
+      }
+      bannerEl.className = 'banner ' + cls;
+      document.getElementById('bdot').textContent = dot;
+      document.getElementById('verdict').textContent = verdict;
+      document.getElementById('bcount').textContent = count;
+      document.getElementById('stamp').textContent = new Date().toLocaleString('en-NZ', { dateStyle: 'medium', timeStyle: 'short' });
+      btn.disabled = false;
+    }
+
+    document.getElementById('rerun').addEventListener('click', runAll);
+    window.addEventListener('load', () => setTimeout(runAll, 80));
+  })();
+  </script>
+</body>
+</html>

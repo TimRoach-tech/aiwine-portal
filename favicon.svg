@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#6E2230"></stop>
+      <stop offset="1" stop-color="#4A1119"></stop>
+    </linearGradient>
+    <linearGradient id="wine" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#D9B36A"></stop>
+      <stop offset="1" stop-color="#B9863E"></stop>
+    </linearGradient>
+  </defs>
+  <rect x="0" y="0" width="64" height="64" rx="15" fill="url(#bg)"></rect>
+  <rect x="0.75" y="0.75" width="62.5" height="62.5" rx="14.25" fill="none" stroke="#C9A45A" stroke-opacity="0.30" stroke-width="1.5"></rect>
+  
+  <g>
+    
+    <path d="M18.5 13 H45.5 C45.5 27.5 39.2 35 32 35 C24.8 35 18.5 27.5 18.5 13 Z" fill="#F4EFE5"></path>
+    
+    <path d="M21.4 20.4 C23.7 28.4 27.7 33.4 32 33.4 C36.3 33.4 40.3 28.4 42.6 20.4 Z" fill="url(#wine)"></path>
+    
+    <rect x="30.4" y="34.4" width="3.2" height="12.4" rx="1" fill="#F4EFE5"></rect>
+    
+    <rect x="21" y="47" width="22" height="3.6" rx="1.8" fill="#F4EFE5"></rect>
+  </g>
+</svg>

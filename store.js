@@ -164,6 +164,7 @@
           notes: w.notes || null, pairings: (w.pairings && w.pairings.length) ? w.pairings : null,
           awards: w.awards ? String(w.awards).split(';').map(s => s.trim()).filter(Boolean) : null,
           region: w.region || Store.wineryRegion, "subRegion": w.subRegion || null,
+          image: w.image || null,
           published: true, wineryId: activeWineryId,
         };
         const { data } = await sb.from('wines').insert(row).select().single();
@@ -180,7 +181,7 @@
     },
   };
 
-  function normWine(r) { return { id: r.id, name: r.name, variety: r.variety, colour: r.colour, vintage: r.vintage, price: +r.price || 0, qty: +r.stock || +r.qty || 0, scans: +r.scans || 0 }; }
+  function normWine(r) { return { id: r.id, name: r.name, variety: r.variety, colour: r.colour, vintage: r.vintage, price: +r.price || 0, qty: +r.stock || +r.qty || 0, scans: +r.scans || 0, image: r.image || null }; }
   function normOrder(r) {
     const items = (r.order_items || []).map(i => `${i.qty} × ${i.name}`).join(' · ');
     return { id: r.id, placedAt: rel(r.placedAt), destination: r.destination, items, total: +r.total || 0, status: r.status };
