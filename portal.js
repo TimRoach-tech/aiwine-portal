@@ -703,7 +703,16 @@
   }
 
   // ---------- login (live mode) ----------
+  function loginErrText(raw){
+    const m=(raw||'').toLowerCase();
+    if(/not confirmed|email.*confirm/.test(m)) return 'Your email isn’t confirmed yet — the account exists but needs verifying. Check your inbox for the AIWine confirmation link, or resend it below.';
+    if(/invalid login|invalid credentials|incorrect/.test(m)) return 'Email or password is incorrect. If you just created the account, tap “Forgot password?” to set one.';
+    if(/already/.test(m)) return 'That email is already registered — sign in below, or use “Forgot password?” if you don’t know the password.';
+    return raw;
+  }
   function renderLogin(err){
+    const friendly = err ? loginErrText(err) : '';
+    const needsConfirm = err && /not confirmed|email.*confirm/i.test(err);
     document.getElementById('app').innerHTML = `
       <div style="grid-column:1/-1;min-height:100vh;display:grid;place-items:center;background:linear-gradient(180deg,#241B15,var(--ink))">
         <form id="lf" style="width:min(360px,90vw);background:var(--card);border:1px solid var(--line);border-radius:14px;padding:30px 28px;box-shadow:0 30px 80px rgba(0,0,0,.4)">
@@ -711,7 +720,8 @@
           <div style="font-family:var(--serif);font-size:26px;font-weight:600;margin:10px 0 18px">Winery sign in</div>
           <div class="field" style="margin-bottom:12px"><label>Email</label><input id="le" type="email" autofocus></div>
           <div class="field" style="margin-bottom:14px"><label>Password</label><input id="lp" type="password"></div>
-          ${err?`<div style="color:var(--red);font-size:12.5px;margin-bottom:12px">${esc(err)}</div>`:''}
+          ${friendly?`<div style="color:var(--red);font-size:12.5px;margin-bottom:12px;line-height:1.5">${esc(friendly)}</div>`:''}
+          ${needsConfirm?`<button type="button" id="lf-resend" class="btn" style="width:100%;justify-content:center;margin-bottom:12px">Resend confirmation email</button>`:''}
           <button class="btn primary" type="submit" style="width:100%;justify-content:center">Sign in</button>
           <button type="button" id="lf-forgot" style="display:block;width:100%;text-align:center;margin-top:14px;background:none;border:none;color:var(--brass);font-size:12.5px;cursor:pointer;text-decoration:underline;text-underline-offset:3px">Forgot password?</button>
           <div style="text-align:center;margin-top:16px;padding-top:16px;border-top:1px solid var(--line);font-size:12.5px;color:var(--ink-soft)">New to AIWine? <button type="button" id="lf-signup" style="background:none;border:none;color:var(--claret);font-weight:600;cursor:pointer;font-size:12.5px">Create a winery account</button></div>
@@ -724,6 +734,11 @@
       catch(ex){ renderLogin(ex.message); }
     });
     document.getElementById('lf-forgot').addEventListener('click', ()=>renderReset());
+    const rs=document.getElementById('lf-resend');
+    if(rs) rs.addEventListener('click', async ()=>{
+      try { rs.disabled=true; rs.textContent='Sending…'; await PStore.resendConfirmation(document.getElementById('le').value.trim()); rs.textContent='Confirmation sent — check your inbox'; }
+      catch(ex){ rs.disabled=false; rs.textContent='Resend confirmation email'; const t=document.getElementById('toast'); if(t){ t.textContent=ex.message||'Could not resend'; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2600);} }
+    });
     document.getElementById('lf-signup').addEventListener('click', ()=>renderSignup());
   }
 

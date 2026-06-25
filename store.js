@@ -86,6 +86,14 @@
     },
     async signOut() { if (sb) await sb.auth.signOut(); session = null; },
 
+    async resendConfirmation(email) {
+      if (!LIVE) throw new Error('Available on the live portal.');
+      const e = (email || '').trim().toLowerCase();
+      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e)) throw new Error('Enter your email above first.');
+      const { error } = await sb.auth.resend({ type: 'signup', email: e });
+      if (error) throw new Error(error.message);
+      return true;
+    },
     async resetPassword(email) {
       if (!LIVE) throw new Error('Password reset is available on the live portal.');
       const e = (email || '').trim().toLowerCase();
