@@ -748,6 +748,11 @@
     let r; try { r = await PStore.init(); } catch(e){ r = { ok:false, error:e.message }; }
     if (r && r.needsAuth)  { renderLogin(); return; }
     if (r && r.needsSetup) { routeSetup(); return; }
+    if (PStore.mode === 'live' && (!r || r.ok === false)) {
+      // live connection failed — never fall through to the demo dashboard
+      renderLogin((r && r.error) || 'Could not connect. Please check your connection and try again.');
+      return;
+    }
     WINES = PStore.wines; ORDERS = PStore.orders;
     shell();
     go('dashboard');

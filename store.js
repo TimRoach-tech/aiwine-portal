@@ -25,7 +25,8 @@
     { id:'AW-2021', placedAt:'4 days ago', destination:'Nelson', items:'4 × Craighall Chardonnay', total:220, status:'shipped' },
   ];
 
-  let sb = null, session = null, wineryId = null, wineryName = 'Ata Rangi', wineryRegion = 'Martinborough';
+  let sb = null, session = null, wineryId = null,
+      wineryName = LIVE ? '' : 'Ata Rangi', wineryRegion = LIVE ? '' : 'Martinborough';
   const Store = {
     mode: LIVE ? 'live' : 'demo',
     wines: [], orders: [],
@@ -168,11 +169,13 @@
   function rel(ts) { if (!ts) return ''; const d = (Date.now() - new Date(ts)) / 86400000; return d < 1 ? 'today' : d < 2 ? 'yesterday' : Math.floor(d) + ' days ago'; }
 
   async function loadWinery() {
-    const { data: map } = await sb.from('winery_users').select('wineryId').limit(1).maybeSingle();
+    const { data: map, error } = await sb.from('winery_users').select('"wineryId"').limit(1).maybeSingle();
+    if (error) { console.warn('winery_users lookup failed:', error.message); wineryId = null; return; }
     wineryId = map ? map.wineryId : null;
     if (wineryId) {
       const { data: w } = await sb.from('wineries').select('name,region').eq('id', wineryId).maybeSingle();
       if (w) { wineryName = w.name; wineryRegion = w.region; }
+      else { wineryName = 'Your winery'; wineryRegion = ''; }
     }
   }
   function loadLib() {
