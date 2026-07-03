@@ -25,13 +25,47 @@
     { id:'AW-2021', placedAt:'4 days ago', destination:'Nelson', items:'4 × Craighall Chardonnay', total:220, status:'shipped' },
   ];
 
-  let sb = null, session = null, wineryId = null,
+  let sb = null, session = null, wineryId = null, wineries = [],
       wineryName = LIVE ? '' : 'Ata Rangi', wineryRegion = LIVE ? '' : 'Martinborough';
+  const ACTIVE_KEY = 'aiwine-portal:activeWinery';
   const Store = {
     mode: LIVE ? 'live' : 'demo',
     wines: [], orders: [],
     get wineryName() { return wineryName; },
     get wineryRegion() { return wineryRegion; },
+    get userEmail() { return (session && session.user && session.user.email) || ''; },
+    get wineryId() { return wineryId; },
+    get wineries() { return wineries; },   // [{id,name,region}] — all wineries this login manages
+    get ordersEmail() { const w = wineries.find(x => x.id === wineryId); return (w && w.ordersEmail) || ''; },
+    get planCellarDoor() { const w = wineries.find(x => x.id === wineryId); return !!(w && w.cellarDoorActive); },
+    get planGrow() { const w = wineries.find(x => x.id === wineryId); return !!(w && w.growActive); },
+    // redeem an activation code for the ACTIVE winery → returns the feature it unlocked
+    async redeemCode(code) {
+      const { data, error } = await sb.rpc('redeem_activation_code', { p_winery: wineryId, p_code: code });
+      if (error) throw new Error(/invalid_code/.test(error.message) ? 'That code isn\u2019t valid.' : error.message);
+      const w = wineries.find(x => x.id === wineryId);
+      if (w) { if (data === 'grow') w.growActive = true; else w.cellarDoorActive = true; }
+      return data;
+    },
+    // re-read plan flags for the active winery (e.g. after returning from Stripe)
+    async refreshPlan() {
+      const { data: w } = await sb.from('wineries').select('"cellarDoorActive","growActive","ordersEmail"').eq('id', wineryId).maybeSingle();
+      const cur = wineries.find(x => x.id === wineryId);
+      if (w && cur) Object.assign(cur, w);
+      return Store.planCellarDoor || Store.planGrow;
+    },
+    async setOrdersEmail(email) {
+      const { error } = await sb.rpc('set_orders_email', { p_winery: wineryId, p_email: email || '' });
+      if (error) throw new Error(/invalid_email/.test(error.message) ? 'That doesn\u2019t look like a valid email address.' : error.message);
+      const w = wineries.find(x => x.id === wineryId); if (w) w.ordersEmail = email;
+    },
+    // switch which winery the portal is editing (multi-winery logins)
+    async setActiveWinery(id) {
+      const w = wineries.find(x => x.id === id); if (!w) return;
+      wineryId = w.id; wineryName = w.name; wineryRegion = w.region || '';
+      try { localStorage.setItem(ACTIVE_KEY, id); } catch (e) {}
+      await Store.reload();
+    },
 
     // ---- boot: load Supabase lib + restore session (live) or seed (demo) ----
     async init() {
@@ -59,12 +93,12 @@
     },
     // winery submits (or updates) its request to join — lands in the CRM queue
     async requestAccess(p) {
-      const { error } = await sb.rpc('request_winery_access', {
+      const { data, error } = await sb.rpc('request_winery_access', {
         p_name: p.name, p_region: p.region || null, p_website: p.website || null,
         p_contact: p.contact || null, p_message: p.message || null, p_country: p.country || 'NZ',
       });
       if (error) throw new Error(error.message);
-      return true;
+      return data;   // 'pending' | 'linked'
     },
     // the signed-in user's own request (RLS returns only their row), or null
     async myRequest() {
@@ -86,8 +120,8 @@
     async reload() {
       if (!LIVE) return;
       const [w, o] = await Promise.all([
-        sb.from('wines').select('*').order('name'),
-        sb.from('orders').select('*, order_items(*)').order('placedAt', { ascending: false }),
+        sb.from('wines').select('*').eq('wineryId', wineryId).order('name'),
+        sb.from('orders').select('*, order_items(*)').eq('wineryId', wineryId).order('placedAt', { ascending: false }),
       ]);
       Store.wines = (w.data || []).map(normWine);
       Store.orders = (o.data || []).map(normOrder);
@@ -169,14 +203,16 @@
   function rel(ts) { if (!ts) return ''; const d = (Date.now() - new Date(ts)) / 86400000; return d < 1 ? 'today' : d < 2 ? 'yesterday' : Math.floor(d) + ' days ago'; }
 
   async function loadWinery() {
-    const { data: map, error } = await sb.from('winery_users').select('"wineryId"').limit(1).maybeSingle();
-    if (error) { console.warn('winery_users lookup failed:', error.message); wineryId = null; return; }
-    wineryId = map ? map.wineryId : null;
-    if (wineryId) {
-      const { data: w } = await sb.from('wineries').select('name,region').eq('id', wineryId).maybeSingle();
-      if (w) { wineryName = w.name; wineryRegion = w.region; }
-      else { wineryName = 'Your winery'; wineryRegion = ''; }
-    }
+    const { data: maps, error } = await sb.from('winery_users').select('"wineryId"');
+    if (error) { console.warn('winery_users lookup failed:', error.message); wineryId = null; wineries = []; return; }
+    const ids = (maps || []).map(m => m.wineryId);
+    if (!ids.length) { wineryId = null; wineries = []; return; }
+    const { data: ws } = await sb.from('wineries').select('id,name,region,"ordersEmail","cellarDoorActive","growActive"').in('id', ids).order('name');
+    wineries = ws || ids.map(id => ({ id, name: 'Your winery', region: '' }));
+    let pick = null;
+    try { pick = localStorage.getItem(ACTIVE_KEY); } catch (e) {}
+    const active = wineries.find(x => x.id === pick) || wineries[0];
+    wineryId = active.id; wineryName = active.name; wineryRegion = active.region || '';
   }
   function loadLib() {
     return new Promise((res, rej) => {

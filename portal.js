@@ -52,11 +52,21 @@
   PLAN=Object.assign({ cellarDoor:false, grow:false, story:'', hours:'', activatedVia:'' }, PLAN);
   function savePlan(){ try{ localStorage.setItem(PLAN_KEY, JSON.stringify(PLAN)); }catch(e){} }
   const CODES={ 'FOUNDING49':{price:49,label:'Founding'}, 'WAIRARAPA':{price:0,label:'Wairarapa Association'} };
+  const hasCellar=()=> PStore.mode==='live' ? PStore.planCellarDoor : PLAN.cellarDoor;
+  const hasGrow  =()=> PStore.mode==='live' ? PStore.planGrow : PLAN.grow;
   function activate(via, price){ PLAN.cellarDoor=true; PLAN.activatedVia=via; savePlan(); go('plan'); toast(price?('Virtual Cellar Door active \u00b7 $'+price+'/yr'):'Virtual Cellar Door active \u00b7 free'); }
   function demoCheckout(price, what){
     if(PStore.mode==='live'){
+      const links=(window.PORTAL_CONFIG&&window.PORTAL_CONFIG.STRIPE_LINKS)||{};
+      const link=what==='grow'?links.grow:links.cellarDoor;
+      if(link){
+        const url=link+(link.includes('?')?'&':'?')+'client_reference_id='+encodeURIComponent(PStore.wineryId||'');
+        window.open(url,'_blank');
+        toast('Card payment opens in a new tab — activates automatically on payment');
+        return;
+      }
       location.href='mailto:partners@aiwine.co.nz?subject='+encodeURIComponent((what==='grow'?'Grow package':'Virtual Cellar Door')+' — '+(PStore.wineryName||'winery'));
-      toast('Online payment is coming soon — email us and we’ll set you up');
+      toast('Card payment is being switched on — email us and we’ll activate you');
       return;
     }
     if(!confirm('Demo checkout \u2014 Stripe goes here at go-live.\n\n'+(what==='grow'?'Grow package':'Virtual Cellar Door')+' \u00b7 $'+price+'/yr.\n\nProceed (demo) to unlock?')) return;
@@ -100,8 +110,16 @@
           <div class="wordmark">AI<span class="dot"></span>Wine<span class="sfx">Partner</span></div>
           <div class="winery-badge">
             <span class="av">${esc((PStore.wineryName||'A').charAt(0))}</span>
-            <div style="min-width:0"><div class="nm">${esc(PStore.wineryName||'My Winery')}</div><div class="rg">${esc(PStore.wineryRegion||'')}</div></div>
+            <div style="min-width:0;flex:1">
+              ${live && PStore.wineries && PStore.wineries.length>1 ? `
+              <select id="winery-switch" style="width:100%;background:transparent;border:none;color:inherit;font:inherit;font-weight:700;cursor:pointer;padding:0;appearance:auto">
+                ${PStore.wineries.map(w=>`<option value="${esc(w.id)}" ${w.id===PStore.wineryId?'selected':''} style="color:#241B15">${esc(w.name)}</option>`).join('')}
+              </select>
+              <div class="rg">${esc(PStore.wineryRegion||'')} · ${PStore.wineries.length} wineries</div>`
+              : `<div class="nm">${esc(PStore.wineryName||'My Winery')}</div><div class="rg">${esc(PStore.wineryRegion||'')}</div>`}
+            </div>
           </div>
+          ${live?`<a href="#" id="add-winery" style="display:block;font-size:11px;color:rgba(244,239,229,0.55);margin-top:8px;text-decoration:none">+ Add another winery</a>`:''}
         </div>
         <nav class="nav" id="nav">
           ${NAV.map(n=> n.sec ? `<div class="nav-sec">${n.sec}</div>` :
@@ -110,7 +128,7 @@
               ${n.badge?`<span class="badge" data-badge="${n.id}"></span>`:''}
             </button>`).join('')}
         </nav>
-        <div class="side-foot">${live?`Signed in · ${esc(PStore.wineryName||'Your winery')}`:'Demo data'} · <a href="${APP_URL}" target="_blank">Open winery app ↗</a><br>${live?`<a href="#" id="signout" style="opacity:.8">Sign out</a>`:`<span style="opacity:0.6">Live data connects at deploy</span>`}</div>
+        <div class="side-foot">${live?`<a href="${APP_URL}" target="_blank">Open winery app ↗</a>`:`Demo data · <a href="${APP_URL}" target="_blank">Open winery app ↗</a>`}</div>
       </aside>
       <div class="main">
         <div class="topbar">
@@ -119,8 +137,8 @@
             <span class="demo">${live?esc((PStore.wineryRegion?PStore.wineryName+' · '+PStore.wineryRegion:PStore.wineryName)||'Live'):'Demo · sample data'}</span>
           </div>
           <div class="actions">
-            <button class="btn sm ghost" id="t-app">${ic('passport',15)} Winery app</button>
-            <button class="btn sm primary" id="t-add">${ic('plus',15)} Add wine</button>
+            ${live?`<span style="font-size:13px;color:var(--ink-soft)">${esc((PStore.userEmail&&PStore.userEmail.split('@')[0])||PStore.wineryName||'')}</span>
+            <button class="btn sm ghost" id="signout">Sign out</button>`:''}
           </div>
         </div>
         <div class="content">
@@ -138,10 +156,10 @@
 
     $('#nav').addEventListener('click', e=>{ const b=e.target.closest('[data-go]'); if(b) go(b.dataset.go); });
     $('#menu').addEventListener('click', ()=>$('#side').classList.toggle('open'));
-    $('#t-add').addEventListener('click', addWineModal);
-    $('#t-app').addEventListener('click', ()=>window.open(APP_URL,'_blank'));
     $('#scrim').addEventListener('click', closeModal);
     const so=$('#signout'); if(so) so.addEventListener('click', async e=>{ e.preventDefault(); await PStore.signOut(); renderLogin(); });
+    const ws=$('#winery-switch'); if(ws) ws.addEventListener('change', async ()=>{ await PStore.setActiveWinery(ws.value); WINES=PStore.wines; ORDERS=PStore.orders; shell(); go('dashboard'); toast('Now managing '+PStore.wineryName); });
+    const aw=$('#add-winery'); if(aw) aw.addEventListener('click', e=>{ e.preventDefault(); addWineryModal(); });
     updateBadges();
   }
 
@@ -185,6 +203,7 @@
           <div style="display:flex;align-items:center;gap:10px"><span class="pill new">1</span><div><b>Upload your wine list</b> — download our template, fill it in, drop it back. <a href="#" data-go="upload" style="color:var(--claret);font-weight:600">Start upload →</a></div></div>
           <div style="display:flex;align-items:center;gap:10px"><span class="pill new">2</span><div><b>Check prices &amp; stock</b> — fine-tune anything in My Wines. <a href="#" data-go="wines" style="color:var(--claret);font-weight:600">My wines →</a></div></div>
           <div style="display:flex;align-items:center;gap:10px"><span class="pill new">3</span><div><b>Put the winery app on your phone</b> — stock updates from the cellar door. <a href="${APP_URL}" target="_blank" style="color:var(--claret);font-weight:600">Open the app ↗</a></div></div>
+          <div style="display:flex;align-items:center;gap:10px"><span class="pill new">4</span><div><b>Optional upgrades</b> — <b>Virtual Cellar Door</b> (your story, hours &amp; photos on AIWine) and <b>Grow</b> (scan insights &amp; EPOS/API integrations), <b>$95/yr each</b>, paid by card (Stripe) — activates immediately. Free uploads &amp; orders stay free forever. <a href="#" data-go="plan" style="color:var(--claret);font-weight:600">See plans →</a></div></div>
         </div>
       </div>` : '';
     el.innerHTML = `
@@ -300,7 +319,26 @@
       <div class="card"><div class="tbl-wrap"><table class="tbl">
         <thead><tr><th>Order</th><th>Items</th><th>Destination</th><th class="r">Total</th><th>Status</th><th></th></tr></thead>
         <tbody>${rows.map(orderRow).join('')||`<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:30px">Nothing here.</td></tr>`}</tbody>
-      </table></div></div>`;
+      </table></div></div>
+      ${PStore.mode==='live'?`
+      <div class="card card-pad" style="margin-top:16px;display:flex;align-items:center;gap:16px;flex-wrap:wrap">
+        <div style="flex:1;min-width:240px">
+          <div class="card-title" style="font-size:16px;margin-bottom:3px">Order notifications${(PStore.wineries||[]).length>1?` \u00b7 ${esc(PStore.wineryName)}`:''}</div>
+          <div style="font-size:12.5px;color:var(--ink-soft)">New orders for this winery are emailed here the moment they land. Each winery has its own address.</div>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <input id="oe-mail" type="email" value="${esc(PStore.ordersEmail||'')}" placeholder="orders@yourwinery.co.nz" style="width:240px;padding:9px 12px;border:1px solid var(--line);border-radius:8px;background:var(--card-2);font-size:13px">
+          <button class="btn sm primary" id="oe-save">Save</button>
+        </div>
+      </div>`:''}`;
+    const oe=el.querySelector('#oe-save');
+    if(oe) oe.addEventListener('click', async ()=>{
+      const v=el.querySelector('#oe-mail').value.trim();
+      oe.disabled=true; oe.textContent='Saving…';
+      try{ await PStore.setOrdersEmail(v); toast(v?'Order emails go to '+v:'Order email cleared'); }
+      catch(e){ toast(e.message); }
+      oe.disabled=false; oe.textContent='Save';
+    });
     el.querySelectorAll('[data-seg]').forEach(b=>b.addEventListener('click',()=>{ el._seg=b.dataset.seg; RENDER.orders(el); }));
     el.querySelectorAll('[data-ship]').forEach(b=>b.addEventListener('click',()=>{ const o=ORDERS.find(x=>x.id===b.dataset.ship); PStore.updateOrder(o.id,{status:'shipped'}); updateBadges(); RENDER.orders(el); toast('Marked shipped · '+o.id); }));
     el.querySelectorAll('[data-pack]').forEach(b=>b.addEventListener('click',()=>{ const o=ORDERS.find(x=>x.id===b.dataset.pack); PStore.updateOrder(o.id,{status:'packing'}); RENDER.orders(el); toast('Moved to packing · '+o.id); }));
@@ -443,7 +481,7 @@
   }
 
   RENDER.plan = el => {
-    const active = PLAN.cellarDoor;
+    const active = hasCellar();
     const gate = `
       <div class="card card-pad">
         <div class="label" style="color:var(--brass);margin-bottom:8px">Virtual Cellar Door \u00b7 $95/yr</div>
@@ -455,8 +493,9 @@
         </div>
         <div style="display:flex;gap:8px;align-items:center;max-width:400px">
           <input id="code" placeholder="Have an activation code?" style="flex:1;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:var(--card-2);font-size:14px">
-          <button class="btn" id="act-code">Apply</button>
+            <button class="btn" id="act-code">Apply</button>
         </div>
+        <div style="font-size:12px;color:var(--muted);margin-top:12px">Pay by card — secure Stripe checkout, activates immediately. No invoices, cancel anytime. GST receipt emailed. <a href="#" id="plan-refresh" style="color:var(--claret)">Just paid? Check activation</a></div>
       </div>`;
     const editor = `
       <div class="card">
@@ -475,11 +514,23 @@
       <div class="card card-pad" style="margin-top:20px;display:flex;align-items:center;gap:18px;flex-wrap:wrap">
         <div style="flex:1;min-width:240px"><div class="card-title" style="margin-bottom:4px">Grow \u2014 insights &amp; integrations</div>
         <div style="font-size:13px;color:var(--ink-soft)">Scan insights, demand signals and API/EPOS sync. <b>$95/yr.</b></div></div>
-        ${PLAN.grow?'<span class="pill in">Active</span>':'<button class="btn primary" id="grow-buy">Unlock Grow \u00b7 $95/yr</button>'}
+        ${hasGrow()?'<span class="pill in">Active</span>':'<button class="btn primary" id="grow-buy">Unlock Grow \u00b7 $95/yr</button>'}
       </div>`;
     if(!active){
-      el.querySelector('#act-code').addEventListener('click',()=>{ const c=(el.querySelector('#code').value||'').trim().toUpperCase(); const hit=CODES[c]; if(!hit){ toast('That code isn\u2019t valid'); return; } activate(hit.label, hit.price); });
+      el.querySelector('#act-code').addEventListener('click', async ()=>{
+        const c=(el.querySelector('#code').value||'').trim().toUpperCase();
+        if(!c) return;
+        if(PStore.mode==='live'){
+          const b=el.querySelector('#act-code'); b.disabled=true; b.textContent='Checking…';
+          try{ const f=await PStore.redeemCode(c); toast(f==='grow'?'Grow unlocked':'Virtual Cellar Door active'); go('plan'); }
+          catch(e){ toast(e.message); b.disabled=false; b.textContent='Apply'; }
+          return;
+        }
+        const hit=CODES[c]; if(!hit){ toast('That code isn\u2019t valid'); return; } activate(hit.label, hit.price);
+      });
       el.querySelectorAll('[data-pay]').forEach(b=>b.addEventListener('click',()=>demoCheckout(+b.dataset.pay)));
+      const pr=el.querySelector('#plan-refresh');
+      if(pr) pr.addEventListener('click', async e=>{ e.preventDefault(); if(PStore.mode!=='live') return; await PStore.refreshPlan(); go('plan'); toast(hasCellar()||hasGrow()?'Activated — welcome aboard':'Not active yet — payments can take a minute'); });
     } else {
       el.querySelector('#cd-save').addEventListener('click',()=>{ PLAN.story=el.querySelector('#cd-story').value; PLAN.hours=el.querySelector('#cd-hours').value; savePlan(); toast('Cellar door updated \u00b7 live on your profile'); });
     }
@@ -487,7 +538,7 @@
   };
 
   RENDER.app = el => {
-    const on = PLAN.grow;
+    const on = hasGrow();
     el.innerHTML = `
       <div class="page-head"><div><div class="eyebrow">In your pocket</div><h1 class="page-title">Winery <em>app</em>.</h1>
       <div class="sub-line">Manage stock and watch live scans from your phone — same login, same data.</div></div></div>
@@ -558,7 +609,7 @@
       }
     }
     else if(scope==='local') body=local;
-    else if(!PLAN.grow) body=locked(scope==='regional'?'Regional':'National', scope==='regional'?'how your whole region is trending':'the national picture');
+    else if(!hasGrow()) body=locked(scope==='regional'?'Regional':'National', scope==='regional'?'how your whole region is trending':'the national picture');
     else if(scope==='regional') body=`<div class="two">${aggCard('Most-asked varieties · Wairarapa', [['Pinot Noir',38],['Chardonnay',22],['Sauvignon Blanc',16],['Syrah',12],['Rosé',8]], 'Aggregated across 40+ Wairarapa wineries on AIWine. Anonymised.')}${aggCard('Demand vs last quarter', [['Pinot Noir',12],['Rosé',9],['Chardonnay',5],['Syrah',3],['Sauvignon Blanc',2]], 'Change in Sommelier asks across the region.')}</div>`;
     else body=`<div class="two">${aggCard('Most-asked varieties · New Zealand', [['Sauvignon Blanc',41],['Pinot Noir',24],['Chardonnay',14],['Pinot Gris',9],['Rosé',7]], 'Aggregated across every region on AIWine. Anonymised.')}${aggCard('Rising nationally · last 90 days', [['Albariño',31],['Chenin Blanc',22],['Syrah',14],['Rosé',11],['Pinot Gris',6]], 'Fastest-growing Sommelier asks, nationwide.')}</div>`;
     el.innerHTML = `<div class="page-head"><div><div class="eyebrow">Demand signals</div><h1 class="page-title"><em>Insights</em>.</h1><div class="sub-line">Your own data is free. Grow adds the regional &amp; national picture.</div></div>${tabs}</div>${body}`;
@@ -567,7 +618,7 @@
   };
 
   RENDER.integrations = el => {
-    if(!PLAN.grow){ el.innerHTML=growLock('Integrations'); el.querySelector('#go-plan').addEventListener('click',()=>go('plan')); return; }
+    if(!hasGrow()){ el.innerHTML=growLock('Integrations'); el.querySelector('#go-plan').addEventListener('click',()=>go('plan')); return; }
     el.innerHTML=`
       <div class="page-head"><div><div class="eyebrow">Connect</div><h1 class="page-title"><em>Integrations</em>.</h1>
       <div class="sub-line">Three ways to keep your range in sync — pick what suits how you work.</div></div></div>
@@ -632,6 +683,36 @@
   }
   function openModal(){ $('#scrim').classList.add('open'); $('#modal').classList.add('open'); }
   function closeModal(){ $('#scrim').classList.remove('open'); $('#modal').classList.remove('open'); }
+
+  // ---------- add ANOTHER winery (multi-winery logins, e.g. wine groups) ----------
+  function addWineryModal(){
+    $('#modal').innerHTML=`
+      <div class="modal-head"><h2>Add another winery</h2><button class="btn-quiet" id="m-x">${ic('x',18)}</button></div>
+      <div class="modal-body">
+        <div style="font-size:13px;color:var(--ink-soft);margin-bottom:2px">Manage several wineries from this one login. Each addition is reviewed by AIWine (usually within a business day) — you'll see it in the switcher once approved.</div>
+        <div class="field"><label>Winery name</label><input id="awx-name" placeholder="e.g. Mt Difficulty"></div>
+        <div class="field"><label>Region</label><input id="awx-region" placeholder="e.g. Central Otago"></div>
+        <div class="field"><label>Website (optional)</label><input id="awx-web"></div>
+        <div id="awx-err" style="color:var(--red);font-size:12.5px"></div>
+      </div>
+      <div class="modal-foot">
+        <button class="btn" id="m-cancel">Cancel</button>
+        <button class="btn primary" id="awx-go">Submit for review</button>
+      </div>`;
+    openModal();
+    $('#m-x').addEventListener('click',closeModal);
+    $('#m-cancel').addEventListener('click',closeModal);
+    $('#awx-go').addEventListener('click', async ()=>{
+      const name=$('#awx-name').value.trim();
+      if(!name){ $('#awx-err').textContent='Please enter the winery name.'; return; }
+      const b=$('#awx-go'); b.disabled=true; b.textContent='Submitting…';
+      try{
+        const r=await PStore.requestAccess({ name, region:$('#awx-region').value.trim(), website:$('#awx-web').value.trim() });
+        closeModal();
+        toast(r==='linked'?'That winery is already on this login':'Submitted — we\u2019ll review it within a business day');
+      }catch(e){ b.disabled=false; b.textContent='Submit for review'; $('#awx-err').textContent=e.message; }
+    });
+  }
 
   // ---------- auth screens (live mode) ----------
   const authShell = inner => `
