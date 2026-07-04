@@ -162,8 +162,8 @@
       <div id="toast"></div>`;
 
     $('#nav').addEventListener('click', e=>{ const b=e.target.closest('[data-go]'); if(b) go(b.dataset.go); });
-    $('#menu').addEventListener('click', ()=>$('#side').classList.toggle('open'));
-    $('#scrim').addEventListener('click', closeModal);
+    $('#menu').addEventListener('click', ()=>{ const s=$('#side'); s.classList.toggle('open'); $('#scrim').classList.toggle('open', s.classList.contains('open')||$('#modal').classList.contains('open')); });
+    $('#scrim').addEventListener('click', ()=>{ closeModal(); $('#side').classList.remove('open'); $('#scrim').classList.remove('open'); });
     const so=$('#signout'); if(so) so.addEventListener('click', async e=>{ e.preventDefault(); await PStore.signOut(); renderLogin(); });
     const wb=$('#wb'), wm=$('#winery-menu');
     if(wb && wm){
@@ -197,6 +197,7 @@
     const el = $('#screen-'+id); if(!el){ console.warn('no screen for',id); return; } el.classList.add('on');
     if(RENDER[id]) RENDER[id](el);
     $('#side').classList.remove('open');
+    if(!$('#modal').classList.contains('open')) $('#scrim').classList.remove('open');
     $('.content').scrollTo?.(0,0); window.scrollTo(0,0);
   }
 
