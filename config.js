@@ -14,7 +14,7 @@ window.PORTAL_CONFIG = {
   // When set, the Plans page "Subscribe" buttons open Stripe card checkout;
   // while empty, buttons fall back to a register-interest email.
   STRIPE_LINKS: {
-    cellarDoor: "",   // e.g. "https://buy.stripe.com/xxxx"  · Virtual Cellar Door $95/yr
-    grow: "",         // e.g. "https://buy.stripe.com/yyyy"  · Grow $95/yr
+    cellarDoor: "",   // "https://buy.stripe.com/aBc123yourRealLink", · Virtual Cellar Door $95/yr
+    grow: "",         // "https://buy.stripe.com/dEf456yourRealLink",  · Grow $95/yr
   },
 };
