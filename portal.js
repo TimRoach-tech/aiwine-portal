@@ -108,18 +108,23 @@
       <aside class="side" id="side">
         <div class="side-top">
           <div class="wordmark">AI<span class="dot"></span>Wine<span class="sfx">Partner</span></div>
-          <div class="winery-badge">
+          ${(()=>{ const multi = live && PStore.wineries && PStore.wineries.length>1; return `
+          <div class="winery-badge${multi?' switchable':''}" id="wb" ${multi?'role="button" tabindex="0" aria-label="Switch winery"':''}>
             <span class="av">${esc((PStore.wineryName||'A').charAt(0))}</span>
             <div style="min-width:0;flex:1">
-              ${live && PStore.wineries && PStore.wineries.length>1 ? `
-              <select id="winery-switch" style="width:100%;background:transparent;border:none;color:inherit;font:inherit;font-weight:700;cursor:pointer;padding:0;appearance:auto">
-                ${PStore.wineries.map(w=>`<option value="${esc(w.id)}" ${w.id===PStore.wineryId?'selected':''} style="color:#241B15">${esc(w.name)}</option>`).join('')}
-              </select>
-              <div class="rg">${esc(PStore.wineryRegion||'')} · ${PStore.wineries.length} wineries</div>`
-              : `<div class="nm">${esc(PStore.wineryName||'My Winery')}</div><div class="rg">${esc(PStore.wineryRegion||'')}</div>`}
+              <div class="nm">${esc(PStore.wineryName||'My Winery')}</div>
+              <div class="rg">${multi?esc(PStore.wineryRegion||'')+' · '+PStore.wineries.length+' wineries':esc(PStore.wineryRegion||'')}</div>
             </div>
+            ${multi?'<span class="chev">▾</span>':''}
           </div>
-          ${live?`<a href="#" id="add-winery" style="display:block;font-size:11px;color:rgba(244,239,229,0.55);margin-top:8px;text-decoration:none">+ Add another winery</a>`:''}
+          ${multi?`<div class="winery-menu" id="winery-menu">
+            ${PStore.wineries.map(w=>`<button class="wm-item${w.id===PStore.wineryId?' on':''}" data-wid="${esc(w.id)}">
+              <span class="mini">${esc((w.name||'A').charAt(0))}</span>
+              <span class="wm-nm">${esc(w.name)}</span>
+              ${w.id===PStore.wineryId?'<span class="tick">✓</span>':''}
+            </button>`).join('')}
+            <button class="wm-add" id="add-winery">+ Add another winery</button>
+          </div>`:(live?`<a href="#" id="add-winery" style="display:block;font-size:11px;color:rgba(244,239,229,0.55);margin-top:8px;text-decoration:none">+ Add another winery</a>`:'')}`; })()}
         </div>
         <nav class="nav" id="nav">
           ${NAV.map(n=> n.sec ? `<div class="nav-sec">${n.sec}</div>` :
@@ -148,6 +153,8 @@
           <div id="screen-upload" class="screen"></div>
           <div id="screen-insights" class="screen"></div>
           <div id="screen-integrations" class="screen"></div>
+          <div id="screen-plan" class="screen"></div>
+          <div id="screen-app" class="screen"></div>
         </div>
       </div>
       <div class="scrim" id="scrim"></div>
@@ -158,7 +165,19 @@
     $('#menu').addEventListener('click', ()=>$('#side').classList.toggle('open'));
     $('#scrim').addEventListener('click', closeModal);
     const so=$('#signout'); if(so) so.addEventListener('click', async e=>{ e.preventDefault(); await PStore.signOut(); renderLogin(); });
-    const ws=$('#winery-switch'); if(ws) ws.addEventListener('change', async ()=>{ await PStore.setActiveWinery(ws.value); WINES=PStore.wines; ORDERS=PStore.orders; shell(); go('dashboard'); toast('Now managing '+PStore.wineryName); });
+    const wb=$('#wb'), wm=$('#winery-menu');
+    if(wb && wm){
+      const togg=()=>{ wb.classList.toggle('open'); wm.classList.toggle('open'); };
+      wb.addEventListener('click',togg);
+      wb.addEventListener('keydown',e=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); togg(); } });
+      wm.querySelectorAll('.wm-item').forEach(b=>b.addEventListener('click', async ()=>{
+        if(b.dataset.wid===PStore.wineryId){ togg(); return; }
+        b.style.opacity='0.6';
+        await PStore.setActiveWinery(b.dataset.wid);
+        WINES=PStore.wines; ORDERS=PStore.orders;
+        shell(); go('dashboard'); toast('Now managing '+PStore.wineryName);
+      }));
+    }
     const aw=$('#add-winery'); if(aw) aw.addEventListener('click', e=>{ e.preventDefault(); addWineryModal(); });
     updateBadges();
   }
@@ -175,8 +194,8 @@
     route = id;
     document.querySelectorAll('.nav-link').forEach(l=>l.classList.toggle('on', l.dataset.go===id));
     document.querySelectorAll('.screen').forEach(s=>s.classList.remove('on'));
-    const el = $('#screen-'+id); el.classList.add('on');
-    RENDER[id](el);
+    const el = $('#screen-'+id); if(!el){ console.warn('no screen for',id); return; } el.classList.add('on');
+    if(RENDER[id]) RENDER[id](el);
     $('#side').classList.remove('open');
     $('.content').scrollTo?.(0,0); window.scrollTo(0,0);
   }

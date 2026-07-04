@@ -29,6 +29,21 @@ a{color:inherit;text-decoration:none;}
 .winery-badge .av{width:34px;height:34px;border-radius:8px;background:linear-gradient(145deg,var(--claret),var(--claret-deep));display:grid;place-items:center;font-family:var(--serif);font-style:italic;font-size:18px;color:var(--brass-soft);flex-shrink:0;}
 .winery-badge .nm{font-weight:700;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .winery-badge .rg{font-family:var(--mono);font-size:9.5px;letter-spacing:0.12em;text-transform:uppercase;color:rgba(244,239,229,0.55);}
+/* multi-winery switcher */
+.winery-badge.switchable{cursor:pointer;user-select:none;transition:background .15s,border-color .15s;}
+.winery-badge.switchable:hover{background:rgba(244,239,229,0.1);border-color:rgba(244,239,229,0.22);}
+.winery-badge .chev{margin-left:auto;color:rgba(244,239,229,0.55);font-size:12px;transition:transform .18s;}
+.winery-badge.open .chev{transform:rotate(180deg);}
+.winery-menu{display:none;margin-top:6px;background:rgba(20,14,10,0.45);border:1px solid rgba(244,239,229,0.12);border-radius:var(--r);overflow:hidden;}
+.winery-menu.open{display:block;}
+.wm-item{display:flex;align-items:center;gap:9px;width:100%;padding:9px 11px;background:none;border:none;color:rgba(244,239,229,0.8);font:inherit;font-size:12.5px;font-weight:600;cursor:pointer;text-align:left;transition:background .12s;}
+.wm-item:hover{background:rgba(244,239,229,0.08);color:#F4EFE5;}
+.wm-item.on{color:#F4EFE5;background:rgba(244,239,229,0.06);}
+.wm-item .mini{width:22px;height:22px;border-radius:6px;background:linear-gradient(145deg,var(--claret),var(--claret-deep));display:grid;place-items:center;font-family:var(--serif);font-style:italic;font-size:11px;color:#F4EFE5;flex-shrink:0;}
+.wm-item .wm-nm{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.wm-item .tick{color:var(--brass-soft);font-size:11px;}
+.wm-add{display:block;width:100%;padding:9px 11px;background:none;border:none;border-top:1px solid rgba(244,239,229,0.1);color:rgba(244,239,229,0.5);font:inherit;font-size:11.5px;cursor:pointer;text-align:left;transition:color .12s;}
+.wm-add:hover{color:rgba(244,239,229,0.85);}
 .nav{padding:14px 14px;display:flex;flex-direction:column;gap:3px;position:relative;z-index:1;flex:1;}
 .nav-sec{font-family:var(--mono);font-size:9px;letter-spacing:0.18em;text-transform:uppercase;color:rgba(244,239,229,0.4);padding:14px 10px 7px;}
 .nav-link{display:flex;align-items:center;gap:11px;padding:10px 12px;border-radius:8px;color:rgba(244,239,229,0.8);font-weight:500;font-size:13.5px;transition:background .18s,color .18s;border:none;background:none;width:100%;text-align:left;}
