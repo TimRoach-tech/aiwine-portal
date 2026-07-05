@@ -23,3 +23,12 @@
 - Menu button opens/closes the sidebar; tapping outside closes it
 - Plans & Cellar Door, Insights, Integrations, Winery app all show content
 - Multi-winery login: switcher is dark claret style, not blue
+
+
+---
+## Icon / logo refresh (6 Jul 2026)
+New AIWine glass mark (line-art glass, brass 80% fill, sparkle + hidden "A"). Colour by surface:
+- Claret = public web + consumer app
+- Green = winery portal + winery app
+- Charcoal = CRM
+Just overwrite the matching favicon / app-icon / .svg files in place. No HTML changes needed except portal/index.html (favicon now local: favicon.svg) which is included here.
