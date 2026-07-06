@@ -11,6 +11,7 @@
     upload:'<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M12 3v13M7 8l5-5 5 5"/>',
     bag:'<path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4zM3 6h18M16 10a4 4 0 0 1-8 0"/>',
     plug:'<path d="M9 2v6M15 2v6M6 8h12v3a6 6 0 0 1-12 0zM12 17v5"/>',
+    image:'<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 16l5-5 4 4 3-3 6 6"/><circle cx="8.5" cy="9.5" r="1.5"/>',
     scan:'<path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2M7 12h10"/>',
     sparkle:'<path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/>',
     heart:'<path d="M20.8 5.6a5 5 0 0 0-7 0L12 7.3l-1.8-1.7a5 5 0 0 0-7 7L12 21l8.8-8.4a5 5 0 0 0 0-7z"/>',
@@ -95,6 +96,7 @@
     { id:'wines', label:'My Wines', icon:'bottle' },
     { id:'orders', label:'Orders', icon:'bag', badge:()=>ORDERS.filter(o=>o.status==='new').length },
     { id:'upload', label:'Upload list', icon:'upload' },
+    { id:'images', label:'Wine images', icon:'image' },
     { sec:'Grow' },
     { id:'plan', label:'Plans & Cellar Door', icon:'passport' },
     { id:'insights', label:'Insights', icon:'chart' },
@@ -133,7 +135,7 @@
               ${n.badge?`<span class="badge" data-badge="${n.id}"></span>`:''}
             </button>`).join('')}
         </nav>
-        <div class="side-foot">${live?`<a href="${APP_URL}" target="_blank">Open winery app ↗</a>`:`Demo data · <a href="${APP_URL}" target="_blank">Open winery app ↗</a>`}</div>
+        <div class="side-foot">${live?`AIWine Partner`:`Demo data · sample content`}</div>
       </aside>
       <div class="main">
         <div class="topbar">
@@ -290,7 +292,7 @@
       <div class="page-head">
         <div><div class="eyebrow">Your range</div><h1 class="page-title">My <em>wines</em>.</h1>
         <div class="sub-line">Change a price or stock level and it updates across AIWine in seconds.</div></div>
-        <div style="display:flex;gap:10px"><button class="btn" data-go="upload">${ic('upload',15)} Bulk upload</button><button class="btn primary" id="add2">${ic('plus',15)} Add wine</button></div>
+        <div style="display:flex;gap:10px"><button class="btn" data-go="upload">${ic('upload',15)} Bulk upload</button><button class="btn primary" id="add2">${ic('plus',15)} Add bottle</button></div>
       </div>
       <div class="card">
         <div class="tbl-wrap"><table class="tbl">
@@ -532,6 +534,11 @@
       <div class="sub-line">Free portal &amp; wine uploads for everyone. Upgrade for a virtual cellar door and growth tools.</div></div></div>
       ${active ? editor : gate}
       <div class="card card-pad" style="margin-top:20px;display:flex;align-items:center;gap:18px;flex-wrap:wrap">
+        <div style="flex:1;min-width:240px"><div class="card-title" style="margin-bottom:4px">See an example cellar door</div>
+        <div style="font-size:13px;color:var(--ink-soft);line-height:1.55">How your Virtual Cellar Door looks on AIWine — story, visit details, wines and a “Cellar Door” badge. Example: <b>The Good Way</b>.</div></div>
+        <a class="btn" href="https://aiwine.co.nz/cellar-door.html" target="_blank" rel="noopener" style="justify-content:center">View example ↗</a>
+      </div>
+      <div class="card card-pad" style="margin-top:20px;display:flex;align-items:center;gap:18px;flex-wrap:wrap">
         <div style="flex:1;min-width:240px"><div class="card-title" style="margin-bottom:4px">Grow \u2014 insights &amp; integrations</div>
         <div style="font-size:13px;color:var(--ink-soft)">Scan insights, demand signals and API/EPOS sync. <b>$95/yr.</b></div></div>
         ${hasGrow()?'<span class="pill in">Active</span>':'<button class="btn primary" id="grow-buy">Unlock Grow \u00b7 $95/yr</button>'}
@@ -558,27 +565,19 @@
   };
 
   RENDER.app = el => {
-    const on = hasGrow();
     el.innerHTML = `
       <div class="page-head"><div><div class="eyebrow">In your pocket</div><h1 class="page-title">Winery <em>app</em>.</h1>
       <div class="sub-line">Manage stock and watch live scans from your phone — same login, same data.</div></div></div>
-      ${on ? `
-        <div class="card card-pad" style="display:flex;align-items:center;gap:18px;flex-wrap:wrap">
-          <div style="flex:1;min-width:240px"><div class="card-title" style="margin-bottom:4px">Your winery app is unlocked <span class="pill in">Grow</span></div>
-          <div style="font-size:13px;color:var(--ink-soft)">Install it on your phone — live scans, stock from the tractor, and regional &amp; national insights.</div></div>
-          <button class="btn primary" id="app-open">${ic('sparkle',15)} Download the winery app</button>
-        </div>
-        <div class="card card-pad" style="margin-top:16px">
-          <div class="label" style="margin-bottom:10px">How to install</div>
-          <div style="font-size:13.5px;color:var(--ink-soft);line-height:1.6">Open the link on your phone, then choose <b>Add to Home Screen</b> — it installs like a normal app, icon and all. Same login as this portal.</div>
-        </div>` : `
-        <div class="card card-pad" style="text-align:center;padding:48px 24px">
-          <div style="font-family:var(--serif);font-size:26px;margin-bottom:8px">The winery app is part of <span style="color:var(--claret)">Grow</span></div>
-          <div style="font-size:13.5px;color:var(--ink-soft);max-width:480px;margin:0 auto 18px">Grow ($95/yr) unlocks the winery app — live scans and stock on your phone, plus regional &amp; national insights. Your own data stays free here in the portal.</div>
-          <button class="btn primary" id="app-grow">See plans</button>
-        </div>`}`;
+      <div class="card card-pad" style="display:flex;align-items:center;gap:18px;flex-wrap:wrap">
+        <div style="flex:1;min-width:240px"><div class="card-title" style="margin-bottom:4px">Get the AIWine Winery app</div>
+        <div style="font-size:13px;color:var(--ink-soft);line-height:1.55">Live scans, quick stock edits from the cellar door, and orders on the go. It installs straight to your home screen — no app store needed.</div></div>
+        <button class="btn primary" id="app-open">${ic('sparkle',15)} Download the winery app</button>
+      </div>
+      <div class="card card-pad" style="margin-top:16px">
+        <div class="label" style="margin-bottom:10px">How to install</div>
+        <div style="font-size:13.5px;color:var(--ink-soft);line-height:1.7"><b>1.</b> Tap <b>Download the winery app</b> above (open it on your phone).<br><b>2.</b> Choose <b>Add to Home Screen</b> — iPhone: Share then “Add to Home Screen”. Android: menu ⋮ then “Install app”.<br><b>3.</b> Open it from your home screen and sign in with your portal login.</div>
+      </div>`;
     const o=el.querySelector('#app-open'); if(o) o.addEventListener('click',()=>window.open(APP_URL,'_blank'));
-    const g=el.querySelector('#app-grow'); if(g) g.addEventListener('click',()=>go('plan'));
   };
 
   RENDER.insights = el => {
@@ -638,18 +637,34 @@
   };
 
   RENDER.integrations = el => {
-    if(!hasGrow()){ el.innerHTML=growLock('Integrations'); el.querySelector('#go-plan').addEventListener('click',()=>go('plan')); return; }
+    const partners = [
+      ['Shopify','E-commerce','Sync products, stock and sales from your Shopify store.'],
+      ['WooCommerce','E-commerce','WordPress / WooCommerce product and stock sync.'],
+      ['Squarespace','E-commerce','Keep your Squarespace shop and AIWine in step.'],
+      ['Vend by Lightspeed','EPOS','Cellar-door till sales keep your AIWine stock current.'],
+      ['Square','EPOS','Square POS sales adjust your live stock automatically.'],
+      ['Lightspeed Retail','EPOS','Retail point-of-sale inventory sync.'],
+      ['EPOS Now','EPOS','Point-of-sale stock kept in sync in real time.'],
+      ['Xero','Accounting','Push orders and invoices straight into Xero.'],
+      ['Cin7 Core','Inventory','Warehouse and 3PL stock levels flow through.'],
+    ];
     el.innerHTML=`
       <div class="page-head"><div><div class="eyebrow">Connect</div><h1 class="page-title"><em>Integrations</em>.</h1>
-      <div class="sub-line">Three ways to keep your range in sync — pick what suits how you work.</div></div></div>
+      <div class="sub-line">Keep your range in sync — from a simple spreadsheet today to full till &amp; store automation.</div></div></div>
+      <div class="label" style="margin:4px 0 12px">Available now</div>
       <div class="int-grid">
         ${intCard('upload','CSV / Excel upload','Available now','in','Upload a spreadsheet whenever your range changes. We match columns automatically and you confirm before publishing.','Go to upload','upload')}
         ${intCard('grid','Live dashboard','Available now','in','Edit prices and stock directly here — every change syncs to AIWine in seconds. No spreadsheets needed.','Manage wines','wines')}
-        ${intCard('plug','API / EPOS sync','Coming soon','low','Connect your till or online store (Shopify, Vend, Square) so stock keeps itself in sync — every sale, every restock, automatically.','Register interest',null,'mailto:partners@aiwine.co.nz?subject=API%20integration')}
+        ${intCard('bottle','Wine images','Available now','in','Drag in your bottle photos — each lands on the right wine by file name.','Add photos','images')}
+      </div>
+      <div class="label" style="margin:26px 0 12px">Point-of-sale, e-commerce &amp; accounting <span style="color:var(--muted);font-weight:400">· coming soon</span></div>
+      <div class="int-grid">
+        ${intCard('plug','Open API &amp; webhooks','Coming soon','low','A REST API and webhooks to push stock and pull scan data programmatically.','Register interest',null,'mailto:partners@aiwine.co.nz?subject=Open%20API')}
+        ${partners.map(p=>intCard('plug',p[0],'Coming soon','low',p[1]+' — '+p[2],'Register interest',null,'mailto:partners@aiwine.co.nz?subject='+encodeURIComponent(p[0]+' integration'))).join('')}
       </div>
       <div class="card card-pad" style="margin-top:22px;display:flex;align-items:center;gap:18px;flex-wrap:wrap">
         <div style="flex:1;min-width:240px"><div class="card-title" style="margin-bottom:4px">The AIWine Winery app</div><div style="font-size:13px;color:var(--ink-soft);line-height:1.55">Manage stock and watch live scans from your phone — perfect for the cellar door. Same login, same data as this portal.</div></div>
-        <button class="btn primary" id="open-app">${ic('passport',15)} Open the winery app</button>
+        <button class="btn primary" id="open-app">${ic('sparkle',15)} Get the winery app</button>
       </div>`;
     el.querySelectorAll('[data-go]').forEach(b=>b.addEventListener('click',()=>go(b.dataset.go)));
     el.querySelector('#open-app').addEventListener('click',()=>window.open(APP_URL,'_blank'));
@@ -663,10 +678,53 @@
 
   function bindGo(el){ el.querySelectorAll('[data-go]').forEach(b=>b.addEventListener('click',()=>go(b.dataset.go))); }
 
+  // ---------- wine images (bottle photos) ----------
+  RENDER.images = el => {
+    const KEY='aiwine-portal:wine-images';
+    let imgs; try{ imgs=JSON.parse(localStorage.getItem(KEY))||{}; }catch(e){ imgs={}; }
+    const save=()=>{ try{ localStorage.setItem(KEY,JSON.stringify(imgs)); }catch(e){} };
+    const slug=s=>String(s||'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
+    const toDataURL=(f,cb)=>{ const r=new FileReader(); r.onload=()=>cb(r.result); r.readAsDataURL(f); };
+    let target=null;
+    const single=document.createElement('input'); single.type='file'; single.accept='image/*';
+    single.addEventListener('change',e=>{ const f=e.target.files[0]; if(f&&target){ toDataURL(f,d=>{ imgs[target]=d; save(); draw(); toast('Photo added'); }); } single.value=''; target=null; });
+    function handleFiles(files){
+      const arr=[...files].filter(f=>/^image\//.test(f.type)); let pending=arr.length; if(!pending) return; let matched=0, un=0;
+      arr.forEach(f=>{ const base=slug(f.name.replace(/\.[^.]+$/,''));
+        const w=WINES.find(x=>{ const s1=slug(x.name+'-'+(x.vintage||'')); const s2=slug(x.name); return base===s1||base===s2||(s2&&base.indexOf(s2)>=0); });
+        toDataURL(f,d=>{ if(w){ imgs[w.id]=d; matched++; } else un++; if(--pending===0){ save(); draw(); toast(matched+' matched'+(un?' · '+un+' unmatched':'')); } }); });
+    }
+    function draw(){
+      el.innerHTML = `
+        <div class="page-head"><div><div class="eyebrow">Bottle photos</div><h1 class="page-title">Wine <em>images</em>.</h1>
+        <div class="sub-line">One bottle photo per wine. Drag them all in at once — we match each photo to a wine by its file name.</div></div>
+        <div style="display:flex;gap:10px"><button class="btn primary" id="pickall">${ic('upload',15)} Add photos</button></div></div>
+        <div class="drop" id="drop"><div class="dic">${ic('image',26)}</div><h3>Drop bottle photos here</h3><p>JPG or PNG. Name each file like the wine + vintage, e.g. <b>crimson-pinot-noir-2023.jpg</b> — it lands on the right wine automatically.</p><input type="file" id="fileall" accept="image/*" multiple hidden></div>
+        <div class="card" style="margin-top:18px"><div class="tbl-wrap"><table class="tbl">
+          <thead><tr><th>Photo</th><th>Wine</th><th>File name to use</th><th></th></tr></thead>
+          <tbody>${WINES.map(w=>{ const src=imgs[w.id]; const fn=slug(w.name+'-'+(w.vintage||''))+'.jpg';
+            return `<tr><td><div style="width:38px;height:48px;border-radius:6px;overflow:hidden;background:var(--card-2);display:flex;align-items:center;justify-content:center;color:var(--muted)">${src?`<img src="${src}" style="width:100%;height:100%;object-fit:cover" alt="">`:ic('image',16)}</div></td>
+            <td><div class="wine-nm">${esc(w.name)}</div><div class="wine-meta">${w.variety} · ${w.vintage}</div></td>
+            <td class="mono" style="font-size:12px;color:var(--muted)">${fn}</td>
+            <td style="display:flex;gap:6px;align-items:center"><button class="btn sm" data-up="${w.id}">${src?'Replace':'Upload'}</button>${src?`<button class="btn-quiet" data-rm="${w.id}" title="Remove">${ic('x',15)}</button>`:''}</td></tr>`;
+          }).join('')}</tbody></table></div></div>`;
+      el.querySelectorAll('[data-up]').forEach(b=>b.addEventListener('click',()=>{ target=b.dataset.up; single.click(); }));
+      el.querySelectorAll('[data-rm]').forEach(b=>b.addEventListener('click',()=>{ delete imgs[b.dataset.rm]; save(); draw(); }));
+      const fa=el.querySelector('#fileall');
+      el.querySelector('#pickall').addEventListener('click',()=>fa.click());
+      fa.addEventListener('change',e=>handleFiles(e.target.files));
+      const drop=el.querySelector('#drop');
+      ['dragenter','dragover'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add('over');}));
+      ['dragleave','drop'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove('over');}));
+      drop.addEventListener('drop',e=>{ e.preventDefault(); handleFiles(e.dataTransfer.files); });
+    }
+    draw();
+  };
+
   // ---------- add wine modal ----------
   function addWineModal(){
     $('#modal').innerHTML=`
-      <div class="modal-head"><h2>Add a wine</h2><button class="btn-quiet" id="m-x">${ic('x',18)}</button></div>
+      <div class="modal-head"><h2>Add a bottle</h2><button class="btn-quiet" id="m-x">${ic('x',18)}</button></div>
       <div class="modal-body">
         <div class="field"><label>Wine name</label><input id="f-name" placeholder="e.g. Crimson Pinot Noir" autofocus></div>
         <div class="grid-2">
