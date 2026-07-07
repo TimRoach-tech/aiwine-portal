@@ -151,6 +151,8 @@
         <div class="content">
           <div id="screen-dashboard" class="screen"></div>
           <div id="screen-wines" class="screen"></div>
+          <div id="screen-images" class="screen"></div>
+          <div id="screen-cellar" class="screen"></div>
           <div id="screen-orders" class="screen"></div>
           <div id="screen-upload" class="screen"></div>
           <div id="screen-insights" class="screen"></div>
@@ -536,7 +538,7 @@
       <div class="card card-pad" style="margin-top:20px;display:flex;align-items:center;gap:18px;flex-wrap:wrap">
         <div style="flex:1;min-width:240px"><div class="card-title" style="margin-bottom:4px">See an example cellar door</div>
         <div style="font-size:13px;color:var(--ink-soft);line-height:1.55">How your Virtual Cellar Door looks on AIWine — story, visit details, wines and a “Cellar Door” badge. Example: <b>The Good Way</b>.</div></div>
-        <a class="btn" href="https://aiwine.co.nz/cellar-door.html" target="_blank" rel="noopener" style="justify-content:center">View example ↗</a>
+        <a class="btn" href="#" data-go="cellar" style="justify-content:center">View example ↗</a>
       </div>
       <div class="card card-pad" style="margin-top:20px;display:flex;align-items:center;gap:18px;flex-wrap:wrap">
         <div style="flex:1;min-width:240px"><div class="card-title" style="margin-bottom:4px">Grow \u2014 insights &amp; integrations</div>
@@ -562,6 +564,44 @@
       el.querySelector('#cd-save').addEventListener('click',()=>{ PLAN.story=el.querySelector('#cd-story').value; PLAN.hours=el.querySelector('#cd-hours').value; savePlan(); toast('Cellar door updated \u00b7 live on your profile'); });
     }
     const gb=el.querySelector('#grow-buy'); if(gb) gb.addEventListener('click',()=>demoCheckout(95,'grow'));
+    bindGo(el);
+  };
+
+  RENDER.cellar = el => {
+    el.innerHTML = `
+      <div class="page-head"><div><div class="eyebrow">Example · Virtual Cellar Door</div><h1 class="page-title">The <em>Good Way</em>.</h1>
+      <div class="sub-line">A preview of how your Virtual Cellar Door looks to customers on AIWine.</div></div>
+      <button class="btn" data-go="plan">${ic('x',15)} Close</button></div>
+      <div class="card" style="overflow:hidden">
+        <div style="background:linear-gradient(150deg,#3A0E18,#5C1B27 62%,#431019);color:#F4EFE5;padding:34px 30px;position:relative">
+          <span style="display:inline-flex;align-items:center;gap:7px;font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;background:rgba(201,168,120,.22);border:1px solid rgba(201,168,120,.5);color:#E7CD9A;border-radius:999px;padding:5px 12px">${ic('sparkle',12)} Cellar Door</span>
+          <div style="font-family:var(--serif);font-size:34px;font-weight:600;margin:14px 0 4px">The Good Way</div>
+          <div style="font-size:13.5px;opacity:.86">Martinborough · Wairarapa</div>
+        </div>
+        <div class="card-pad">
+          <div style="font-size:14.5px;line-height:1.65;color:var(--ink-soft);max-width:60ch">A small family estate on the Martinborough terrace, farming organically since 2004. We make single-vineyard Pinot Noir and aromatic whites the honest way — hand-picked, wild-fermented, and never rushed. Drop in for a tasting and a wander through the vines.</div>
+          <div class="grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px;margin-top:22px">
+            <div><div class="label" style="margin-bottom:4px">Open</div><div style="font-size:13.5px">Fri–Sun · 11am–5pm</div></div>
+            <div><div class="label" style="margin-bottom:4px">Tastings</div><div style="font-size:13.5px">$15pp · waived on purchase</div></div>
+            <div><div class="label" style="margin-bottom:4px">Find us</div><div style="font-size:13.5px">42 Puruatanga Rd, Martinborough</div></div>
+            <div><div class="label" style="margin-bottom:4px">Book</div><div style="font-size:13.5px">hello@thegoodway.co.nz</div></div>
+          </div>
+        </div>
+        <div class="card-pad" style="border-top:1px solid var(--line-soft)">
+          <div class="label" style="margin-bottom:14px">Our wines</div>
+          <div class="grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:12px">
+            ${(WINES.length?WINES.slice(0,6):[{name:'Terrace Pinot Noir',variety:'Pinot Noir',vintage:'2022',price:52},{name:'Wild Ferment Chardonnay',variety:'Chardonnay',vintage:'2023',price:38},{name:'Dry Riesling',variety:'Riesling',vintage:'2023',price:30}]).map(w=>`
+              <div style="border:1px solid var(--line-soft);border-radius:12px;padding:14px;display:flex;gap:12px;align-items:center">
+                <div style="width:30px;height:46px;border-radius:5px;flex:none;background:${TINT[w.variety]||'#6B1F2A'}"></div>
+                <div><div style="font-weight:600;font-size:13.5px;line-height:1.2">${esc(w.name)}</div>
+                <div style="font-size:11.5px;color:var(--muted);margin-top:2px">${w.variety} · ${w.vintage}</div>
+                <div style="font-size:13px;color:var(--claret);font-weight:600;margin-top:3px">$${(+w.price||0).toFixed(0)}</div></div>
+              </div>`).join('')}
+          </div>
+        </div>
+      </div>
+      <div style="font-size:12px;color:var(--muted);margin-top:14px;text-align:center">This is a demo preview. Activate the Virtual Cellar Door to publish yours on AIWine.</div>`;
+    bindGo(el);
   };
 
   RENDER.app = el => {
