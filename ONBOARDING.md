@@ -122,6 +122,10 @@ distribute, so the same message works for every winery and every association:
 >    business day) and email you when it's ready.
 > 4. Sign in, go to **Upload list**, and add your range — your wines go live on
 >    AIWine.
+> 5. On **My Wines**, set your **fulfilment profile**: *Any quantity* (customers
+>    buy 1+ bottles; $12 delivery under 6, free on a Discovery Six) or
+>    *Sixes & twelves* (you pack full cartons only — the cart requires multiples
+>    of 6 and the AI helps customers complete each carton).
 >
 > Free to list. Questions: partners@aiwine.co.nz
 

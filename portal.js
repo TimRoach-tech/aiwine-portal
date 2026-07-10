@@ -302,8 +302,30 @@
           <tbody id="wines-body">${WINES.map(wineRow).join('')}</tbody>
         </table></div>
       </div>
-      <div style="margin-top:14px;font-size:12.5px;color:var(--muted)">${ic('check',13,'var(--green)')} Changes save instantly and sync to the consumer app, the shop and your cellar-door listing.</div>`;
+      <div style="margin-top:14px;font-size:12.5px;color:var(--muted)">${ic('check',13,'var(--green)')} Changes save instantly and sync to the consumer app, the shop and your cellar-door listing.</div>
+      <div class="card card-pad" style="margin-top:18px" id="fulfil-card">
+        <div style="display:flex;align-items:flex-start;gap:16px;flex-wrap:wrap">
+          <div style="flex:1;min-width:260px">
+            <div class="card-title" style="margin-bottom:4px">How you ship · fulfilment profile</div>
+            <div style="font-size:12.5px;color:var(--ink-soft);line-height:1.55">This sets how the AIWine cart sells your wines. <b>Any quantity</b> — customers buy 1+ bottles ($12 delivery under 6, free on a Discovery Six). <b>Sixes &amp; twelves</b> — you pack full cartons only; the cart requires multiples of 6 and the AI suggests wines from your range to complete each carton.</div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:8px;min-width:210px" id="fulfil-opts">
+            <label style="display:flex;align-items:center;gap:9px;font-size:13.5px;cursor:pointer"><input type="radio" name="fulfil" value="any"> Any quantity (1+ bottles)</label>
+            <label style="display:flex;align-items:center;gap:9px;font-size:13.5px;cursor:pointer"><input type="radio" name="fulfil" value="cases"> Sixes &amp; twelves only</label>
+          </div>
+        </div>
+      </div>`;
     el.querySelector('#add2').addEventListener('click', addWineModal);
+    // fulfilment profile — persists + syncs to AIWine
+    (function(){
+      const FKEY='aiwine-portal:fulfilment';
+      let cur='any'; try{ cur=localStorage.getItem(FKEY)||'any'; }catch(e){}
+      el.querySelectorAll('input[name=fulfil]').forEach(r=>{
+        r.checked = r.value===cur;
+        r.addEventListener('change',()=>{ try{ localStorage.setItem(FKEY,r.value); }catch(e){}
+          toast(r.value==='cases' ? 'Saved — your wines now sell in 6s & 12s on AIWine' : 'Saved — customers can buy any quantity'); });
+      });
+    })();
     bindWineRows(el); bindGo(el);
   };
   function wineRow(w){
