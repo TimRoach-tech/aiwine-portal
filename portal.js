@@ -316,13 +316,22 @@
         </div>
       </div>`;
     el.querySelector('#add2').addEventListener('click', addWineModal);
-    // fulfilment profile — persists + syncs to AIWine
+    // fulfilment profile — writes to Supabase when live (portal → website/app),
+    // localStorage in demo
     (function(){
       const FKEY='aiwine-portal:fulfilment';
-      let cur='any'; try{ cur=localStorage.getItem(FKEY)||'any'; }catch(e){}
+      const live = PStore.mode==='live';
+      let cur='any';
+      if(live){ cur=PStore.fulfilment||'any'; }
+      else { try{ cur=localStorage.getItem(FKEY)||'any'; }catch(e){} }
       el.querySelectorAll('input[name=fulfil]').forEach(r=>{
         r.checked = r.value===cur;
-        r.addEventListener('change',()=>{ try{ localStorage.setItem(FKEY,r.value); }catch(e){}
+        r.addEventListener('change', async ()=>{
+          if(live){
+            try{ await PStore.setFulfilment(r.value); }
+            catch(e){ toast('Could not save — try again'); r.checked=false; el.querySelector(`input[name=fulfil][value="${cur}"]`).checked=true; return; }
+          } else { try{ localStorage.setItem(FKEY,r.value); }catch(e){} }
+          cur=r.value;
           toast(r.value==='cases' ? 'Saved — your wines now sell in 6s & 12s on AIWine' : 'Saved — customers can buy any quantity'); });
       });
     })();

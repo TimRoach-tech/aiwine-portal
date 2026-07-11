@@ -37,6 +37,12 @@
     get wineryId() { return wineryId; },
     get wineries() { return wineries; },   // [{id,name,region}] — all wineries this login manages
     get ordersEmail() { const w = wineries.find(x => x.id === wineryId); return (w && w.ordersEmail) || ''; },
+    get fulfilment() { const w = wineries.find(x => x.id === wineryId); return (w && w.fulfilment) || 'any'; },
+    async setFulfilment(profile) {
+      const { error } = await sb.rpc('set_fulfilment', { p_winery: wineryId, p_profile: profile });
+      if (error) throw new Error(error.message);
+      const w = wineries.find(x => x.id === wineryId); if (w) w.fulfilment = profile;
+    },
     get planCellarDoor() { const w = wineries.find(x => x.id === wineryId); return !!(w && w.cellarDoorActive); },
     get planGrow() { const w = wineries.find(x => x.id === wineryId); return !!(w && w.growActive); },
     // redeem an activation code for the ACTIVE winery → returns the feature it unlocked
@@ -49,7 +55,7 @@
     },
     // re-read plan flags for the active winery (e.g. after returning from Stripe)
     async refreshPlan() {
-      const { data: w } = await sb.from('wineries').select('"cellarDoorActive","growActive","ordersEmail"').eq('id', wineryId).maybeSingle();
+      const { data: w } = await sb.from('wineries').select('"cellarDoorActive","growActive","ordersEmail",fulfilment').eq('id', wineryId).maybeSingle();
       const cur = wineries.find(x => x.id === wineryId);
       if (w && cur) Object.assign(cur, w);
       return Store.planCellarDoor || Store.planGrow;
@@ -207,7 +213,7 @@
     if (error) { console.warn('winery_users lookup failed:', error.message); wineryId = null; wineries = []; return; }
     const ids = (maps || []).map(m => m.wineryId);
     if (!ids.length) { wineryId = null; wineries = []; return; }
-    const { data: ws } = await sb.from('wineries').select('id,name,region,"ordersEmail","cellarDoorActive","growActive"').in('id', ids).order('name');
+    const { data: ws } = await sb.from('wineries').select('id,name,region,"ordersEmail","cellarDoorActive","growActive",fulfilment').in('id', ids).order('name');
     wineries = ws || ids.map(id => ({ id, name: 'Your winery', region: '' }));
     let pick = null;
     try { pick = localStorage.getItem(ACTIVE_KEY); } catch (e) {}
