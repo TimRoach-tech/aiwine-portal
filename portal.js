@@ -489,6 +489,7 @@
   function handleCells(cells, el){
     const prev=el.querySelector('#preview');
     const live = PStore.mode==='live';
+    const wineryRegion = (PStore.wineryRegion||'').trim();   // fallback when a row leaves Region blank
     if(!cells.length){ prev.innerHTML='<div class="card card-pad" style="color:var(--muted)">Empty file.</div>'; return; }
     const head=cells[0].map(h=>String(h||'').toLowerCase());
     const find=keys=>head.findIndex(h=>keys.some(k=>h.includes(k)));
@@ -509,16 +510,19 @@
       if(isExample(name)){ skipped++; return null; }
       const tn=trim25(at(c,ci.notes)); if(tn.cut)trimmedN++;
       const pair=at(c,ci.pairings).split(';').map(s=>s.trim()).filter(Boolean).slice(0,3);
-      return { name, variety:snap(at(c,ci.variety),L_VAR), colour:snap(at(c,ci.colour),L_COL), vintage:at(c,ci.vintage), price:at(c,ci.price), stock:at(c,ci.stock), notes:tn.text, pairings:pair, style:snap(at(c,ci.style),L_STY), organic:/^y/i.test(at(c,ci.organic)), awards:at(c,ci.awards), region:snap(at(c,ci.region),L_REG), sub:at(c,ci.sub) };
+      return { name, variety:snap(at(c,ci.variety),L_VAR), colour:snap(at(c,ci.colour),L_COL), vintage:at(c,ci.vintage), price:at(c,ci.price), stock:at(c,ci.stock), notes:tn.text, pairings:pair, style:snap(at(c,ci.style),L_STY), organic:/^y/i.test(at(c,ci.organic)), awards:at(c,ci.awards), region:snap(at(c,ci.region),L_REG)||wineryRegion, sub:at(c,ci.sub) };
     }).filter(Boolean);
     const matched=rows.filter(x=>WINES.some(w=>w.name.toLowerCase()===String(x.name).toLowerCase())).length;
+    const noRegion=rows.filter(x=>!x.region).length;
+    const regionWarn = noRegion ? `<div class="card-pad" style="background:#F7ECD9;border-bottom:1px solid var(--line-soft);border-left:3px solid var(--brass);font-size:13px;color:var(--ink);line-height:1.5"><b>${noRegion} wine${noRegion>1?'s':''} have no region.</b> Wines need a region to show on AIWine\u2019s regional pages. Add a <b>Region</b> column to your spreadsheet${wineryRegion?'':' \u2014 or set your winery\u2019s region first'}, then re-upload.${wineryRegion?' Blank rows will use your winery region (<b>'+esc(wineryRegion)+'</b>).':''}</div>` : '';
     prev.innerHTML=`<div class="card">
       <div class="card-head"><span class="card-title">Preview · ${rows.length} wines</span><span class="label">${matched} update · ${rows.length-matched} new${skipped?' · '+skipped+' example skipped':''}</span></div>
-      <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Wine</th><th>Variety</th><th>Vintage</th><th>Price</th><th>Stock</th><th></th></tr></thead>
-      <tbody>${rows.slice(0,12).map(x=>{ const isNew=!WINES.some(w=>w.name.toLowerCase()===String(x.name).toLowerCase()); return `<tr><td style="font-weight:600">${esc(x.name)||'<span style="color:var(--red)">missing</span>'}</td><td>${esc(x.variety)}</td><td class="mono" style="font-size:12px">${esc(x.vintage)}</td><td class="mono" style="font-size:12px">${x.price?'$'+esc(x.price):''}</td><td class="mono" style="font-size:12px">${esc(x.stock)}</td><td>${isNew?'<span class="pill new">New</span>':'<span class="pill in">Update</span>'}</td></tr>`; }).join('')}</tbody></table></div>
+      ${regionWarn}
+      <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Wine</th><th>Variety</th><th>Vintage</th><th>Price</th><th>Region</th><th></th></tr></thead>
+      <tbody>${rows.slice(0,12).map(x=>{ const isNew=!WINES.some(w=>w.name.toLowerCase()===String(x.name).toLowerCase()); return `<tr><td style="font-weight:600">${esc(x.name)||'<span style="color:var(--red)">missing</span>'}</td><td>${esc(x.variety)}</td><td class="mono" style="font-size:12px">${esc(x.vintage)}</td><td class="mono" style="font-size:12px">${x.price?'$'+esc(x.price):''}</td><td style="font-size:12px">${x.region?esc(x.region):'<span style="color:#B23A2E;font-weight:600">— none —</span>'}</td><td>${isNew?'<span class="pill new">New</span>':'<span class="pill in">Update</span>'}</td></tr>`; }).join('')}</tbody></table></div>
       <div class="card-pad" style="display:flex;justify-content:space-between;align-items:center;border-top:1px solid var(--line-soft)">
         <span style="font-size:12.5px;color:var(--muted)">${rows.length>12?'+ '+(rows.length-12)+' more':'All rows shown'}${trimmedN?' · '+trimmedN+' note'+(trimmedN>1?'s':'')+' shortened to 25 words':''}</span>
-        <button class="btn primary" id="confirm">${ic('check',15)} Confirm &amp; publish ${rows.length} wines</button>
+        <button class="btn primary" id="confirm" ${noRegion?'disabled title="Every wine needs a region before publishing"':''}>${ic('check',15)} Confirm &amp; publish ${rows.length} wines</button>
       </div></div>`;
     const done=(added,updated,note)=>{ prev.innerHTML='<div class="card card-pad" style="text-align:center"><div style="color:var(--green);margin-bottom:6px">'+ic('check',26,'var(--green)')+'</div><div style="font-weight:700">Your range is live</div><div style="font-size:13px;color:var(--ink-soft);margin-top:4px">'+(added+' new · '+updated+' updated. ')+note+'</div></div>'; };
     prev.querySelector('#confirm').addEventListener('click', async ()=>{
