@@ -603,39 +603,82 @@
   };
 
   RENDER.cellar = el => {
+    const wines = WINES.length ? WINES.slice(0,6) : [
+      {name:'Arapai Pinot Noir',variety:'Pinot Noir',vintage:'2022',price:48,style:'Medium-bodied',region:'Martinborough'},
+      {name:'Arapai Chardonnay',variety:'Chardonnay',vintage:'2023',price:38,style:'Textural',region:'Martinborough'},
+      {name:'Arapai Riesling',variety:'Riesling',vintage:'2023',price:32,style:'Off-dry',region:'Martinborough'}
+    ];
+    const visit = [
+      { ic:'wine', k:'Tastings & glass pours', v:'At the Martinborough Brewery', sub:'Pour, taste and linger' },
+      { ic:'clock', k:'Open', v:'Friday – Sunday', sub:'3pm – 7pm' }
+    ];
+    const story = [
+      'The Good Way Wines is a small, family-run producer based in Martinborough, crafting thoughtful, small-batch wines from their Arapai vineyard. With a focus on land, people and connection, their wines reflect both place and purpose.',
+      'Their intimate tasting shed is Martinborough’s smallest cellar door, built from recycled materials — a warm, personal welcome a world away from the busy tasting room.'
+    ];
     el.innerHTML = `
       <div class="page-head"><div><div class="eyebrow">Example · Virtual Cellar Door</div><h1 class="page-title">The <em>Good Way</em>.</h1>
       <div class="sub-line">A preview of how your Virtual Cellar Door looks to customers on AIWine.</div></div>
       <button class="btn" data-go="plan">${ic('x',15)} Close</button></div>
+
       <div class="card" style="overflow:hidden">
-        <div style="background:linear-gradient(150deg,#3A0E18,#5C1B27 62%,#431019);color:#F4EFE5;padding:34px 30px;position:relative">
-          <span style="display:inline-flex;align-items:center;gap:7px;font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;background:rgba(201,168,120,.22);border:1px solid rgba(201,168,120,.5);color:#E7CD9A;border-radius:999px;padding:5px 12px">${ic('sparkle',12)} Cellar Door</span>
-          <div style="font-family:var(--serif);font-size:34px;font-weight:600;margin:14px 0 4px">The Good Way</div>
-          <div style="font-size:13.5px;opacity:.86">Martinborough · Wairarapa</div>
-        </div>
-        <div class="card-pad">
-          <div style="font-size:14.5px;line-height:1.65;color:var(--ink-soft);max-width:60ch">A small family estate on the Martinborough terrace, farming organically since 2004. We make single-vineyard Pinot Noir and aromatic whites the honest way — hand-picked, wild-fermented, and never rushed. Drop in for a tasting and a wander through the vines.</div>
-          <div class="grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px;margin-top:22px">
-            <div><div class="label" style="margin-bottom:4px">Open</div><div style="font-size:13.5px">Fri–Sun · 11am–5pm</div></div>
-            <div><div class="label" style="margin-bottom:4px">Tastings</div><div style="font-size:13.5px">$15pp · waived on purchase</div></div>
-            <div><div class="label" style="margin-bottom:4px">Find us</div><div style="font-size:13.5px">42 Puruatanga Rd, Martinborough</div></div>
-            <div><div class="label" style="margin-bottom:4px">Book</div><div style="font-size:13.5px">hello@thegoodway.co.nz</div></div>
+        <!-- HERO — image + founding badge, mirroring the live winery page -->
+        <div style="display:grid;grid-template-columns:1.05fr 0.95fr;gap:0;align-items:stretch">
+          <div style="padding:34px 32px;display:flex;flex-direction:column;justify-content:center">
+            <span style="display:inline-flex;align-items:center;gap:8px;align-self:flex-start;font-family:var(--mono);font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:#7A5E33;background:color-mix(in oklab,var(--brass),var(--card) 78%);border:1px solid color-mix(in oklab,var(--brass),var(--card) 52%);padding:7px 13px;border-radius:999px;margin-bottom:20px">${ic('sparkle',12)} Wairarapa Founding Member</span>
+            <div style="font-family:var(--mono);font-size:12px;letter-spacing:.2em;text-transform:uppercase;color:var(--brass);margin-bottom:14px">Cellar Door · Martinborough</div>
+            <div style="font-family:var(--serif);font-size:40px;font-weight:500;line-height:.98;letter-spacing:-.01em;margin-bottom:16px">The Good&nbsp;Way.</div>
+            <div style="font-size:15px;line-height:1.65;color:var(--ink-soft);max-width:46ch">A small, family-run producer crafting thoughtful, small-batch wines from their Arapai vineyard — wines that reflect both place and purpose.</div>
+          </div>
+          <div style="position:relative;background:#2a1019;min-height:320px">
+            <img src="assets/the-good-way.jpg" alt="Pouring a tasting at The Good Way cellar door in Martinborough" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block" />
+            <div style="position:absolute;inset:12px;border:1px solid rgba(255,255,255,.25);pointer-events:none"></div>
           </div>
         </div>
-        <div class="card-pad" style="border-top:1px solid var(--line-soft)">
-          <div class="label" style="margin-bottom:14px">Our wines</div>
-          <div class="grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:12px">
-            ${(WINES.length?WINES.slice(0,6):[{name:'Terrace Pinot Noir',variety:'Pinot Noir',vintage:'2022',price:52},{name:'Wild Ferment Chardonnay',variety:'Chardonnay',vintage:'2023',price:38},{name:'Dry Riesling',variety:'Riesling',vintage:'2023',price:30}]).map(w=>`
-              <div style="border:1px solid var(--line-soft);border-radius:12px;padding:14px;display:flex;gap:12px;align-items:center">
-                <div style="width:30px;height:46px;border-radius:5px;flex:none;background:${TINT[w.variety]||'#6B1F2A'}"></div>
-                <div><div style="font-weight:600;font-size:13.5px;line-height:1.2">${esc(w.name)}</div>
-                <div style="font-size:11.5px;color:var(--muted);margin-top:2px">${w.variety} · ${w.vintage}</div>
-                <div style="font-size:13px;color:var(--claret);font-weight:600;margin-top:3px">$${(+w.price||0).toFixed(0)}</div></div>
+
+        <!-- WINES -->
+        <div class="card-pad" style="border-top:1px solid var(--line-soft);background:var(--bg-alt)">
+          <div class="label" style="color:var(--claret);margin-bottom:4px">The wines</div>
+          <div style="font-family:var(--serif);font-size:24px;margin-bottom:16px">From <em style="font-style:italic;color:var(--claret)">The Good Way</em>.</div>
+          <div class="grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:16px">
+            ${wines.map(w=>{ const tint=TINT[w.variety]||'#6B1F2A'; return `
+              <div style="border:1px solid var(--line);background:var(--card);overflow:hidden">
+                <div style="aspect-ratio:4/5;position:relative;padding:18px;color:rgba(255,255,255,.95);display:flex;flex-direction:column;justify-content:space-between;background:linear-gradient(180deg,${tint} 0%, color-mix(in oklab,${tint},black 28%) 100%)">
+                  <div style="position:absolute;inset:12px;border:1px solid rgba(255,255,255,.18);pointer-events:none"></div>
+                  <div style="font-family:var(--mono);font-size:9px;letter-spacing:.16em;text-transform:uppercase;opacity:.85">${esc(w.variety)} · ${esc(w.vintage)}</div>
+                  <div><div style="font-family:var(--mono);font-size:10px;letter-spacing:.16em;text-transform:uppercase;margin-bottom:6px">The Good Way</div>
+                  <div style="font-family:var(--serif);font-size:22px;line-height:1.05;font-style:italic">${esc(w.name)}</div></div>
+                  <div style="display:flex;justify-content:space-between;align-items:flex-end;font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;opacity:.85"><span>${esc(w.style||'')}</span><span>${esc(w.region||'Martinborough')}</span></div>
+                </div>
+                <div style="padding:14px 16px;display:flex;justify-content:space-between;align-items:center">
+                  <span style="font-family:var(--mono);font-size:15px;font-weight:500">$${(+w.price||0).toFixed(0)}</span>
+                  <span style="padding:8px 15px;border:1px solid var(--ink);border-radius:999px;font-size:11px;font-weight:600">Add to case</span>
+                </div>
+              </div>`; }).join('')}
+          </div>
+        </div>
+
+        <!-- STORY + VISIT -->
+        <div class="card-pad" style="border-top:1px solid var(--line-soft);display:grid;grid-template-columns:1.4fr 1fr;gap:36px;align-items:start">
+          <div>
+            <div class="label" style="color:var(--claret);margin-bottom:4px">The story</div>
+            <div style="font-family:var(--serif);font-size:26px;line-height:1.08;margin-bottom:16px">Small batches, <em style="font-style:italic;color:var(--claret)">made with care</em>.</div>
+            ${story.map(p=>`<p style="font-size:15px;line-height:1.75;color:var(--ink-soft);margin-bottom:14px;max-width:60ch">${esc(p)}</p>`).join('')}
+          </div>
+          <aside style="background:var(--card-2);border:1px solid var(--line);padding:24px">
+            <div style="font-family:var(--mono);font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--brass);display:flex;align-items:center;gap:10px;margin-bottom:16px">Visit <span style="flex:1;height:1px;background:var(--line)"></span></div>
+            ${visit.map((v,i)=>`
+              <div style="display:flex;gap:13px;padding:14px 0;${i<visit.length-1?'border-bottom:1px solid var(--line)':''}">
+                <div style="width:36px;height:36px;border-radius:9px;flex:none;background:var(--bg-alt);display:flex;align-items:center;justify-content:center;color:var(--claret)">${ic(v.ic==='wine'?'sparkle':'passport',18)}</div>
+                <div><div style="font-family:var(--mono);font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin-bottom:4px">${esc(v.k)}</div>
+                <div style="font-family:var(--serif);font-size:20px;line-height:1.2">${esc(v.v)}</div>
+                <div style="font-size:12.5px;color:var(--ink-soft);margin-top:2px">${esc(v.sub)}</div></div>
               </div>`).join('')}
-          </div>
+            <div style="margin-top:18px;font-size:12px;line-height:1.55;color:var(--muted);padding-top:16px;border-top:1px solid var(--line)">Cellar-door details are kept simple and current. Hours can change seasonally and around vintage.</div>
+          </aside>
         </div>
       </div>
-      <div style="font-size:12px;color:var(--muted);margin-top:14px;text-align:center">This is a demo preview. Activate the Virtual Cellar Door to publish yours on AIWine.</div>`;
+      <div style="font-size:12px;color:var(--muted);margin-top:14px;text-align:center">This is a preview of a live cellar door on AIWine. Activate the Virtual Cellar Door to publish yours.</div>`;
     bindGo(el);
   };
 
