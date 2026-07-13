@@ -92,8 +92,18 @@
     },
     async signUp(email, password) {
       if (!sb) { await loadLib(); sb = window.supabase.createClient(CFG.SUPABASE_URL, CFG.SUPABASE_ANON_KEY); }
-      const { data, error } = await sb.auth.signUp({ email, password });
+      // Send the confirmation link back to the PORTAL (Supabase's Site URL points
+      // at the consumer site, so without this a winery would be bounced there).
+      const redirectTo = (typeof window !== 'undefined' && window.location && window.location.origin) || undefined;
+      const { data, error } = await sb.auth.signUp({ email, password, options: redirectTo ? { emailRedirectTo: redirectTo } : {} });
       if (error) throw new Error(error.message);
+      // Already-registered guard: with "Confirm email" on, Supabase returns a
+      // fake-success (no error) for an existing email to avoid leaking who has
+      // an account — the tell is an empty identities array. Surface it as a real
+      // "already exists" error so the UI says "sign in" instead of "check inbox".
+      if (data.user && Array.isArray(data.user.identities) && data.user.identities.length === 0) {
+        throw new Error('already registered');
+      }
       session = data.session;                 // null when “Confirm email” is on
       return { needsVerify: !data.session };
     },
