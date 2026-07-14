@@ -222,12 +222,13 @@
     const firstRun = live && !WINES.length ? `
       <div class="card card-pad" style="margin-bottom:20px">
         <div class="card-title" style="margin-bottom:4px">Welcome to AIWine — let's get your range online</div>
-        <div style="font-size:13px;color:var(--ink-soft);margin-bottom:14px">Three steps and your wines are in front of customers.</div>
+        <div style="font-size:13px;color:var(--ink-soft);margin-bottom:16px">About 15 minutes and your wines are in front of customers. Follow the steps in order.</div>
         <div style="display:flex;flex-direction:column;gap:12px;font-size:13.5px">
-          <div style="display:flex;align-items:center;gap:10px"><span class="pill new">1</span><div><b>Upload your wine list</b> — download our template, fill it in, drop it back. <a href="#" data-go="upload" style="color:var(--claret);font-weight:600">Start upload →</a></div></div>
-          <div style="display:flex;align-items:center;gap:10px"><span class="pill new">2</span><div><b>Check prices &amp; stock</b> — fine-tune anything in My Wines. <a href="#" data-go="wines" style="color:var(--claret);font-weight:600">My wines →</a></div></div>
-          <div style="display:flex;align-items:center;gap:10px"><span class="pill new">3</span><div><b>Put the winery app on your phone</b> — stock updates from the cellar door. <a href="${APP_URL}" target="_blank" style="color:var(--claret);font-weight:600">Open the app ↗</a></div></div>
-          <div style="display:flex;align-items:center;gap:10px"><span class="pill new">4</span><div><b>Optional upgrades</b> — <b>Virtual Cellar Door</b> (your story, hours &amp; photos on AIWine) and <b>Grow</b> (scan insights &amp; EPOS/API integrations), <b>$95/yr each</b>, paid by card (Stripe) — activates immediately. Free uploads &amp; orders stay free forever. <a href="#" data-go="plan" style="color:var(--claret);font-weight:600">See plans →</a></div></div>
+          <div style="display:flex;align-items:flex-start;gap:10px"><span class="pill new">1</span><div><b>Download the wine template</b> — a spreadsheet with the columns we need (including <b>Region</b>) and three greyed example rows to guide you.<div style="margin-top:8px"><a class="btn" href="AIWine Wine Upload Template.xlsx" download="AIWine Wine Upload Template.xlsx" style="justify-content:center;display:inline-flex">${ic('download',15)} Download template</a></div></div></div>
+          <div style="display:flex;align-items:flex-start;gap:10px"><span class="pill new">2</span><div><b>Fill it in</b> — one row per wine. Delete the grey example rows. Set a <b>Region</b> for every wine or it won't show on AIWine's regional pages.</div></div>
+          <div style="display:flex;align-items:flex-start;gap:10px"><span class="pill new">3</span><div><b>Upload it back</b> — drop the file in and we'll preview it before publishing. <a href="#" data-go="upload" style="color:var(--claret);font-weight:600">Start upload →</a></div></div>
+          <div style="display:flex;align-items:flex-start;gap:10px"><span class="pill new">4</span><div><b>Add bottle images &amp; fine-tune</b> — check prices &amp; stock in <a href="#" data-go="wines" style="color:var(--claret);font-weight:600">My Wines</a>, and add label photos in <a href="#" data-go="images" style="color:var(--claret);font-weight:600">Wine images</a>.</div></div>
+          <div style="display:flex;align-items:flex-start;gap:10px"><span class="pill new">5</span><div><b>Optional upgrades</b> — <b>Virtual Cellar Door</b> (your story, hours &amp; photos on AIWine) and <b>Grow</b> (scan insights &amp; integrations), <b>$95/yr each</b>. Free uploads &amp; orders stay free forever. <a href="#" data-go="plan" style="color:var(--claret);font-weight:600">See plans →</a></div></div>
         </div>
       </div>` : '';
     el.innerHTML = `
@@ -630,8 +631,8 @@
             <div style="font-family:var(--serif);font-size:40px;font-weight:500;line-height:.98;letter-spacing:-.01em;margin-bottom:16px">The Good&nbsp;Way.</div>
             <div style="font-size:15px;line-height:1.65;color:var(--ink-soft);max-width:46ch">A small, family-run producer crafting thoughtful, small-batch wines from their Arapai vineyard — wines that reflect both place and purpose.</div>
           </div>
-          <div style="position:relative;background:#2a1019;min-height:320px">
-            <img src="assets/the-good-way.jpg" alt="Pouring a tasting at The Good Way cellar door in Martinborough" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block" />
+          <div style="position:relative;background:#2a1019;min-height:520px">
+            <img src="assets/the-good-way.jpg" alt="Pouring a tasting at The Good Way cellar door in Martinborough" style="position:absolute;inset:0;width:100%;height:100%;object-fit:contain;display:block" />
             <div style="position:absolute;inset:12px;border:1px solid rgba(255,255,255,.25);pointer-events:none"></div>
           </div>
         </div>
@@ -929,6 +930,13 @@
   const writeStash=v =>{ try{ localStorage.setItem(SIGNUP_STASH, JSON.stringify(v)); }catch(_){} };
   const clearStash=()=>{ try{ localStorage.removeItem(SIGNUP_STASH); }catch(_){} };
 
+  // show/hide password toggle — wires a button to flip an input between password/text
+  function pwToggle(btnId, inputId){
+    const b=document.getElementById(btnId), i=document.getElementById(inputId);
+    if(!b||!i) return;
+    b.addEventListener('click', ()=>{ const show=i.type==='password'; i.type=show?'text':'password'; b.textContent=show?'Hide':'Show'; i.focus(); });
+  }
+
   const REGION_OPTS=['Wairarapa','Martinborough','Marlborough','Central Otago','Hawke’s Bay','Nelson','Auckland','Gisborne','Waikato & Bay of Plenty','North Canterbury','Waitaki Valley','Northland','Other'];
   const regionSelect=(id,sel)=>`<select id="${id}"><option value="">Select region…</option>${REGION_OPTS.map(r=>`<option${sel===r?' selected':''}>${r}</option>`).join('')}</select>`;
 
@@ -937,11 +945,15 @@
         <form id="lf" style="${cardStyle}">
           ${authHead('Winery sign in')}
           <div class="field" style="margin-bottom:12px"><label>Email</label><input id="le" type="email" autofocus></div>
-          <div class="field" style="margin-bottom:14px"><label>Password</label><input id="lp" type="password"></div>
+          <div class="field" style="margin-bottom:14px"><label>Password</label>
+            <div style="position:relative"><input id="lp" type="password" style="width:100%;padding-right:64px">
+            <button type="button" id="lp-t" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--claret);font-weight:600;padding:4px 6px">Show</button></div>
+          </div>
           ${errRow(err)}
           <button class="btn primary" type="submit" style="width:100%;justify-content:center">Sign in</button>
           <div style="text-align:center;font-size:12.5px;color:var(--ink-soft);margin-top:16px">New to AIWine? <a href="#" id="to-signup" style="color:var(--claret);font-weight:600">Create your winery account</a></div>
         </form>`);
+    pwToggle('lp-t','lp');
     document.getElementById('to-signup').addEventListener('click', e=>{ e.preventDefault(); renderSignup(); });
     document.getElementById('lf').addEventListener('submit', async e=>{
       e.preventDefault();
@@ -961,7 +973,10 @@
           ${authHead('Create your winery account')}
           <div style="font-size:12.5px;color:var(--ink-soft);margin:-6px 0 16px;line-height:1.5">Tell us about your winery. We’ll review it (usually within a business day) and email you the moment your portal is ready.</div>
           <div class="field" style="margin-bottom:12px"><label>Your email</label><input id="se" type="email" autofocus></div>
-          <div class="field" style="margin-bottom:12px"><label>Password <span style="color:var(--muted);font-weight:400">(min 6 characters)</span></label><input id="sp" type="password"></div>
+          <div class="field" style="margin-bottom:12px"><label>Password <span style="color:var(--muted);font-weight:400">(min 6 characters)</span></label>
+            <div style="position:relative"><input id="sp" type="password" style="width:100%;padding-right:64px">
+            <button type="button" id="sp-t" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--claret);font-weight:600;padding:4px 6px">Show</button></div>
+          </div>
           <div class="field" style="margin-bottom:12px"><label>Winery name</label><input id="sn" placeholder="e.g. Ata Rangi"></div>
           <div class="field" style="margin-bottom:12px"><label>Region</label>${regionSelect('sr')}</div>
           <div class="field" style="margin-bottom:12px"><label>Website <span style="color:var(--muted);font-weight:400">(optional)</span></label><input id="sw" placeholder="atarangi.co.nz"></div>
@@ -971,6 +986,7 @@
           <div style="text-align:center;font-size:12.5px;color:var(--ink-soft);margin-top:16px">Already have an account? <a href="#" id="to-login" style="color:var(--claret);font-weight:600">Sign in</a></div>
         </form>`);
     document.getElementById('to-login').addEventListener('click', e=>{ e.preventDefault(); renderLogin(); });
+    pwToggle('sp-t','sp');
     document.getElementById('sf').addEventListener('submit', async e=>{
       e.preventDefault();
       const email=document.getElementById('se').value.trim();
