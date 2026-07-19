@@ -21,6 +21,7 @@
     check:'<path d="M20 6 9 17l-5-5"/>',
     x:'<path d="M18 6 6 18M6 6l12 12"/>',
     plus:'<path d="M12 5v14M5 12h14"/>',
+    card:'<rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20M6 15h4"/>',
     download:'<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/>',
     bell:'<path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 0 1-3.4 0"/>',
     leaf:'<path d="M11 20A7 7 0 0 1 4 13c0-6 7-10 16-10 0 9-4 16-9 17zM4 13c6-2 9-5 11-9"/>',
@@ -95,6 +96,7 @@
     { id:'dashboard', label:'Dashboard', icon:'grid' },
     { id:'wines', label:'My Wines', icon:'bottle' },
     { id:'orders', label:'Orders', icon:'bag', badge:()=>ORDERS.filter(o=>o.status==='new').length },
+    { id:'payments', label:'Payments', icon:'card' },
     { id:'upload', label:'Upload list', icon:'upload' },
     { id:'images', label:'Wine images', icon:'image' },
     { sec:'Grow' },
@@ -154,6 +156,7 @@
           <div id="screen-images" class="screen"></div>
           <div id="screen-cellar" class="screen"></div>
           <div id="screen-orders" class="screen"></div>
+          <div id="screen-payments" class="screen"></div>
           <div id="screen-upload" class="screen"></div>
           <div id="screen-insights" class="screen"></div>
           <div id="screen-integrations" class="screen"></div>
@@ -404,6 +407,71 @@
     const act = o.status==='shipped'?'':o.status==='new'?`<button class="btn sm" data-pack="${o.id}">Start packing</button>`:`<button class="btn sm primary" data-ship="${o.id}">${ic('truck',14)} Mark shipped</button>`;
     return `<tr><td class="mono" style="font-size:12px">${o.id}<div class="wine-meta" style="margin-top:3px">${o.placedAt}</div></td><td style="font-size:13px;font-weight:600">${esc(o.items)}</td><td>${o.destination}</td><td class="r mono">${money(o.total)}</td><td>${pill}</td><td class="r">${act}</td></tr>`;
   }
+
+  RENDER.payments = el => {
+    const live = PStore.mode==='live';
+    // Demo sample payouts — in live mode this list fills from Stripe (payouts) +
+    // Xero (invoices/remittances) once the winery has its first full month.
+    const PAYOUTS = live ? [] : [
+      { date:'5 Jun 2026', period:'May 2026', ref:'AIW-PAY-0526', orders:14, gross:2840, comm:568, gst:85.20, net:2186.80 },
+      { date:'4 Jul 2026', period:'June 2026', ref:'AIW-PAY-0626', orders:19, gross:3615, comm:723, gst:108.45, net:2783.55 },
+    ];
+    const fm = n => '$' + n.toLocaleString('en-NZ', {minimumFractionDigits:2, maximumFractionDigits:2});
+    const rows = PAYOUTS.map(p=>`
+      <tr>
+        <td><b>${p.date}</b></td><td>${p.period}</td><td style="font-family:var(--mono);font-size:11px">${p.ref}</td>
+        <td>${p.orders}</td><td>${fm(p.gross)}</td><td>−${fm(p.comm)}</td><td>−${fm(p.gst)}</td><td><b>${fm(p.net)}</b></td>
+        <td style="white-space:nowrap"><button class="btn-quiet" disabled title="Coming soon" style="font-size:10px">Statement</button> <button class="btn-quiet" disabled title="Coming soon" style="font-size:10px">Remittance</button></td>
+      </tr>`).join('');
+    el.innerHTML = `
+      <div class="page-head"><div><div class="eyebrow">Money</div><h1 class="page-title"><em>Payments</em>.</h1>
+        <div class="sub-line">Everything AIWine has paid ${PStore.wineryName||'your winery'}, and the paperwork that goes with it.</div></div></div>
+
+      <div class="card card-pad" style="margin-bottom:20px">
+        <div class="card-title" style="margin-bottom:6px">How you get paid</div>
+        <div style="font-size:13.5px;color:var(--ink-soft);line-height:1.65">
+          Customers pay AIWine at checkout. We reconcile each calendar month, deduct our <b>20% commission (+ GST on the commission)</b>, and pay your net sales into your bank account during the <b>first week of the following month</b> — September's sales are in your account in early October. Every payout below comes with a monthly <b>sales statement</b>, a <b>commission tax invoice</b> (GST No. 148-900-086) for your Xero, and a <b>remittance advice</b> matching the bank deposit to the cent.
+        </div>
+      </div>
+
+      <div class="card" style="margin-bottom:20px">
+        <div class="card-head"><span class="card-title">Payments to your winery</span></div>
+        ${PAYOUTS.length?`
+        <div style="overflow-x:auto"><table class="tbl" style="min-width:760px">
+          <thead><tr><th>Paid</th><th>Period</th><th>Reference</th><th>Orders</th><th>Gross sales</th><th>Commission</th><th>GST</th><th>Net paid</th><th>Documents</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table></div>`:`
+        <div class="card-pad" style="text-align:center;padding:44px 24px">
+          <div style="font-family:var(--serif);font-size:20px;font-weight:600">No payouts yet</div>
+          <div style="font-size:13px;color:var(--ink-soft);margin-top:6px;max-width:52ch;margin-left:auto;margin-right:auto">Your first payment arrives in the first week of the month after your first sale. Each one will be listed here with its statement, tax invoice and remittance advice.</div>
+        </div>`}
+      </div>
+
+      <div class="two" style="margin-bottom:20px">
+        <div class="card card-pad">
+          <div class="card-title" style="margin-bottom:10px">Your monthly paperwork</div>
+          <div style="display:flex;flex-direction:column;gap:12px;font-size:13px;color:var(--ink-soft)">
+            <div><b style="color:var(--ink)">1 · Order confirmation</b> — emailed instantly with every order: order number, customer, delivery address, wines, quantities, the amount payable to you, and shipping instructions. Doubles as your packing slip.</div>
+            <div><b style="color:var(--ink)">2 · Commission tax invoice</b> — one per month (not per order): gross sales, 20% commission, GST. Enter it in Xero as an expense.</div>
+            <div><b style="color:var(--ink)">3 · Monthly sales statement</b> — every order line: date, wine, bottles, gross, commission, net — plus refunds and adjustments. Reconcile without logging in anywhere.</div>
+            <div><b style="color:var(--ink)">4 · Remittance advice</b> — sent with each payment: date, reference, orders included, deductions, and the exact net amount deposited.</div>
+          </div>
+        </div>
+        <div class="card card-pad">
+          <div class="card-title" style="margin-bottom:10px">Stripe Connect — get paid per order <span style="font-family:var(--mono);font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--brass);border:1px solid var(--brass-soft);border-radius:999px;padding:3px 8px;margin-left:6px;vertical-align:middle">Coming</span></div>
+          <div style="font-size:13px;color:var(--ink-soft);line-height:1.6">
+            <p style="margin-bottom:10px">Instead of a monthly payout, Stripe Connect splits each sale <b>at the moment the customer pays</b>: your share lands in your own Stripe account (then your bank, typically within 2 business days) and AIWine's commission is deducted automatically — no waiting for month end, no invoices to chase. Your statements and remittance records still appear here.</p>
+            <p style="margin-bottom:14px">Setup is a one-time onboarding through Stripe (identity + bank verification, about 10 minutes).</p>
+            <a class="btn" href="mailto:tim@aiwine.co.nz?subject=Enable%20Stripe%20Connect%20—%20${encodeURIComponent(PStore.wineryName||'our winery')}" style="justify-content:center">Contact us to enable Stripe Connect</a>
+          </div>
+        </div>
+      </div>
+
+      <div class="card card-pad">
+        <div class="card-title" style="margin-bottom:6px">Before your first payout — what we need</div>
+        <div style="font-size:13px;color:var(--ink-soft);line-height:1.65">We don't collect banking details at sign-up, so before your first payment please email <a href="mailto:tim@aiwine.co.nz" style="color:var(--claret);font-weight:600">tim@aiwine.co.nz</a> with: your <b>bank account name &amp; number</b>, your <b>GST number</b> (so statements and invoices are GST-correct), and your <b>accounts email</b> if different from the orders address. One email — then everything here runs automatically.</div>
+      </div>`;
+  };
 
   RENDER.upload = el => {
     el.innerHTML = `
