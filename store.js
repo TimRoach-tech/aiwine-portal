@@ -132,6 +132,25 @@
       return { ok: true };
     },
     async signOut() { if (sb) await sb.auth.signOut(); session = null; },
+    // ---- password reset ----
+    isRecovery() { return /type=recovery/.test(location.hash || ''); },
+    async resetPassword(email) {
+      if (!sb) { await loadLib(); sb = window.supabase.createClient(CFG.SUPABASE_URL, CFG.SUPABASE_ANON_KEY); }
+      const e = (email || '').trim().toLowerCase();
+      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e)) throw new Error('Enter the email for your winery login.');
+      const { error } = await sb.auth.resetPasswordForEmail(e, { redirectTo: location.origin + location.pathname });
+      if (error) throw new Error(error.message);
+      return true;
+    },
+    async setNewPassword(pw) {
+      if (!sb) { await loadLib(); sb = window.supabase.createClient(CFG.SUPABASE_URL, CFG.SUPABASE_ANON_KEY); }
+      if (!pw || pw.length < 6) throw new Error('Password must be at least 6 characters.');
+      const { error } = await sb.auth.updateUser({ password: pw });
+      if (error) throw new Error(error.message);
+      const { data } = await sb.auth.getSession(); session = data && data.session;
+      try { history.replaceState(null, '', location.pathname); } catch (e) {}
+      return true;
+    },
 
     async reload() {
       if (!LIVE) return;

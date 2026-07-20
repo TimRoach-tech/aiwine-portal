@@ -1019,7 +1019,8 @@
           </div>
           ${errRow(err)}
           <button class="btn primary" type="submit" style="width:100%;justify-content:center">Sign in</button>
-          <div style="text-align:center;font-size:12.5px;color:var(--ink-soft);margin-top:16px">New to AIWine? <a href="#" id="to-signup" style="color:var(--claret);font-weight:600">Create your winery account</a></div>
+          <div style="text-align:center;font-size:12.5px;margin-top:12px"><a href="#" id="l-forgot" style="color:var(--muted)">Forgot password?</a></div>
+          <div style="text-align:center;font-size:12.5px;color:var(--ink-soft);margin-top:12px">New to AIWine? <a href="#" id="to-signup" style="color:var(--claret);font-weight:600">Create your winery account</a></div>
         </form>`);
     pwToggle('lp-t','lp');
     document.getElementById('to-signup').addEventListener('click', e=>{ e.preventDefault(); renderSignup(); });
@@ -1032,6 +1033,57 @@
         boot();
       }
       catch(ex){ renderLogin(friendly(ex.message)); }
+    });
+    const fg=document.getElementById('l-forgot');
+    if(fg) fg.addEventListener('click', e=>{ e.preventDefault(); renderReset(document.getElementById('le').value); });
+  }
+
+  function renderReset(prefill, err){
+    document.getElementById('app').innerHTML = authShell(`
+        <form id="rf" style="${cardStyle}">
+          ${authHead('Reset password')}
+          <div style="font-size:12.5px;color:var(--ink-soft);margin:-6px 0 16px;line-height:1.5">Enter your winery login email and we’ll send a link to set a new password.</div>
+          <div class="field" style="margin-bottom:14px"><label>Email</label><input id="re" type="email" value="${esc(prefill||'')}" autofocus></div>
+          ${err?`<div style="color:var(--red);font-size:12.5px;margin-bottom:12px">${esc(err)}</div>`:''}
+          <button class="btn primary" type="submit" style="width:100%;justify-content:center">Send reset link</button>
+          <div style="text-align:center;font-size:12.5px;margin-top:16px"><a href="#" id="r-back" style="color:var(--claret);font-weight:600">Back to sign in</a></div>
+        </form>`);
+    document.getElementById('r-back').addEventListener('click', e=>{ e.preventDefault(); renderLogin(); });
+    document.getElementById('rf').addEventListener('submit', async e=>{
+      e.preventDefault();
+      const email=document.getElementById('re').value;
+      const btn=e.target.querySelector('button[type=submit]'); btn.disabled=true; btn.textContent='Sending…';
+      try {
+        await PStore.resetPassword(email);
+        document.getElementById('app').innerHTML = authShell(`
+        <div style="${cardStyle};text-align:center">
+          ${authHead('Check your inbox')}
+          <div style="font-size:13.5px;color:var(--ink-soft);line-height:1.6;margin-bottom:18px">If a winery account exists for <b>${esc(email)}</b>, we’ve sent a link to set a new password. Open it on this device to continue.</div>
+          <button class="btn primary" id="rb2" style="width:100%;justify-content:center">Back to sign in</button>
+        </div>`);
+        document.getElementById('rb2').addEventListener('click', ()=>renderLogin());
+      } catch(ex){ renderReset(email, friendly(ex.message)); }
+    });
+  }
+
+  function renderRecovery(err){
+    document.getElementById('app').innerHTML = authShell(`
+        <form id="cf" style="${cardStyle}">
+          ${authHead('Set a new password')}
+          <div style="font-size:12.5px;color:var(--ink-soft);margin:-6px 0 16px;line-height:1.5">Choose a new password for your winery login (minimum 6 characters).</div>
+          <div class="field" style="margin-bottom:14px"><label>New password</label>
+            <div style="position:relative"><input id="cp" type="password" style="width:100%;padding-right:64px" autofocus>
+            <button type="button" id="cp-t" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--claret);font-weight:700">Show</button></div>
+          </div>
+          ${err?`<div style="color:var(--red);font-size:12.5px;margin-bottom:12px">${esc(err)}</div>`:''}
+          <button class="btn primary" type="submit" style="width:100%;justify-content:center">Save new password</button>
+        </form>`);
+    pwToggle('cp-t','cp');
+    document.getElementById('cf').addEventListener('submit', async e=>{
+      e.preventDefault();
+      const btn=e.target.querySelector('button[type=submit]'); btn.disabled=true; btn.textContent='Saving…';
+      try { await PStore.setNewPassword(document.getElementById('cp').value); boot(); }
+      catch(ex){ renderRecovery(friendly(ex.message)); }
     });
   }
 
@@ -1149,6 +1201,11 @@
 
   // ---------- boot ----------
   async function boot(){
+    // Arrived from a password-reset email — set the new password before anything else.
+    if (PStore.isRecovery && PStore.isRecovery()) {
+      try { await PStore.init(); } catch(e) {}
+      renderRecovery(); return;
+    }
     let r; try { r = await PStore.init(); } catch(e){ r = { ok:false, error:e.message }; }
     if (r && r.needsAuth)  { renderLogin(); return; }
     if (r && r.needsSetup) { routeSetup(); return; }
