@@ -1195,6 +1195,7 @@
     if(/invalid login/i.test(m)) return 'No account found with that email and password.';
     if(/already registered|already exists/i.test(m)) return 'An account with this email already exists — try signing in instead.';
     if(/email not confirmed/i.test(m)) return 'Please confirm your email (check your inbox), then sign in.';
+    if(/different from the old|should be different/i.test(m)) return 'Your new password must be different from your current password.';
     if(/password/i.test(m)) return 'Password must be at least 6 characters.';
     return m;
   }
