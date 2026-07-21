@@ -1082,7 +1082,20 @@
     document.getElementById('cf').addEventListener('submit', async e=>{
       e.preventDefault();
       const btn=e.target.querySelector('button[type=submit]'); btn.disabled=true; btn.textContent='Saving…';
-      try { await PStore.setNewPassword(document.getElementById('cp').value); boot(); }
+      try {
+        await PStore.setNewPassword(document.getElementById('cp').value);
+        // Don't drop straight into the app (an unlinked account would land on
+        // the winery-setup form, which looks like the reset misfired). Show a
+        // clear confirmation and send them to sign in with the new password.
+        await PStore.signOut();
+        document.getElementById('app').innerHTML = authShell(`
+          <div style="${cardStyle};text-align:center">
+            ${authHead('Password updated')}
+            <div style="font-size:13.5px;color:var(--ink-soft);line-height:1.6;margin-bottom:18px">Your password has been changed. Please sign in with your new password.</div>
+            <button class="btn primary" id="pu-in" style="width:100%;justify-content:center">Go to sign in</button>
+          </div>`);
+        document.getElementById('pu-in').addEventListener('click', ()=>renderLogin());
+      }
       catch(ex){ renderRecovery(friendly(ex.message)); }
     });
   }
