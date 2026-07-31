@@ -18,8 +18,8 @@
     { id:'w6', name:'Kahu Botrytis Riesling', variety:'Riesling', vintage:2021, price:42, qty:0, scans:34 },
   ];
   const DEMO_ORDERS = [
-    { id:'AW-2041', placedAt:'25 min ago', destination:'Auckland', items:'6 × Crimson Pinot Noir', total:204, status:'new' },
-    { id:'AW-2038', placedAt:'2 hours ago', destination:'Wellington', items:'3 × Ata Rangi Pinot · 2 × Te Wā', total:373, status:'new' },
+    { id:'AW-2041', placedAt:'25 min ago', destination:'Auckland', items:'6 × Crimson Pinot Noir', total:204, status:'new', gifts:{ 'Ata Rangi': { wrap:true, message:'Happy 40th Dad — enjoy every drop! Love the whanau x' } } },
+    { id:'AW-2038', placedAt:'2 hours ago', destination:'Cellar-door pickup', items:'3 × Ata Rangi Pinot · 2 × Te Wā', total:373, status:'new', method:'pickup' },
     { id:'AW-2034', placedAt:'Yesterday', destination:'Christchurch', items:'12 × Crimson Pinot Noir', total:346, status:'packing' },
     { id:'AW-2029', placedAt:'2 days ago', destination:'Hamilton', items:'6 × Summer Rosé', total:163, status:'shipped' },
     { id:'AW-2021', placedAt:'4 days ago', destination:'Nelson', items:'4 × Craighall Chardonnay', total:220, status:'shipped' },
@@ -258,7 +258,7 @@
   function normWine(r) { return { id: r.id, name: r.name, variety: r.variety, colour: r.colour, vintage: r.vintage, price: +r.price || 0, qty: +r.stock || +r.qty || 0, scans: +r.scans || 0 }; }
   function normOrder(r) {
     const items = (r.order_items || []).map(i => `${i.qty} × ${i.name}`).join(' · ');
-    return { id: r.id, placedAt: rel(r.placedAt), destination: r.destination, items, total: +r.total || 0, status: r.status };
+    return { id: r.id, placedAt: rel(r.placedAt), destination: r.destination, items, total: +r.total || 0, status: r.status, gifts: r.gifts || null, method: r.method || 'deliver' };
   }
   function rel(ts) { if (!ts) return ''; const d = (Date.now() - new Date(ts)) / 86400000; return d < 1 ? 'today' : d < 2 ? 'yesterday' : Math.floor(d) + ' days ago'; }
 

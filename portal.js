@@ -384,7 +384,15 @@
   function orderRow(o){
     const pill = o.status==='new'?'<span class="pill new">New</span>':o.status==='packing'?'<span class="pill low">Packing</span>':'<span class="pill in">Shipped</span>';
     const act = o.status==='shipped'?'':o.status==='new'?`<button class="btn sm" data-pack="${o.id}">Start packing</button>`:`<button class="btn sm primary" data-ship="${o.id}">${ic('truck',14)} Mark shipped</button>`;
-    return `<tr><td class="mono" style="font-size:12px">${o.id}<div class="wine-meta" style="margin-top:3px">${o.placedAt}</div></td><td style="font-size:13px;font-weight:600">${esc(o.items)}</td><td>${o.destination}</td><td class="r mono">${money(o.total)}</td><td>${pill}</td><td class="r">${act}</td></tr>`;
+    const g = o.gifts && typeof o.gifts==='object' ? Object.values(o.gifts) : [];
+    const wrap = g.some(x=>x&&x.wrap), msg = (g.find(x=>x&&x.message)||{}).message;
+    const tags = [];
+    if(o.method==='pickup') tags.push('<span class="pill low">Cellar-door pickup</span>');
+    if(wrap) tags.push('<span class="pill">Gift wrap</span>');
+    if(msg) tags.push(`<span class="pill" title="${esc(msg)}">Gift message</span>`);
+    const tagLine = tags.length?`<div style="margin-top:5px;display:flex;gap:5px;flex-wrap:wrap">${tags.join('')}</div>`:'';
+    const msgLine = msg?`<div class="wine-meta" style="margin-top:4px;font-style:italic">“${esc(msg)}”</div>`:'';
+    return `<tr><td class="mono" style="font-size:12px">${o.id}<div class="wine-meta" style="margin-top:3px">${o.placedAt}</div></td><td style="font-size:13px;font-weight:600">${esc(o.items)}${tagLine}${msgLine}</td><td>${o.method==='pickup'?'Cellar-door pickup':o.destination}</td><td class="r mono">${money(o.total)}</td><td>${pill}</td><td class="r">${act}</td></tr>`;
   }
 
   RENDER.payments = el => {
