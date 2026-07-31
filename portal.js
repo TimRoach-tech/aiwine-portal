@@ -28,6 +28,7 @@
     menu:'<path d="M3 12h18M3 6h18M3 18h18"/>',
     book:'<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>',
     chart:'<path d="M3 3v18h18M7 16v-5M12 16V8M17 16v-9"/>',
+    settings:'<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>',
   };
   const ic = (n,w,c)=>`<svg width="${w||18}" height="${w||18}" viewBox="0 0 24 24" fill="none" stroke="${c||'currentColor'}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${I[n]||''}</svg>`;
   const vine = (w,c)=>`<svg width="${w}" height="${w}" viewBox="0 0 100 100" fill="none" stroke="${c||'currentColor'}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 24c20-7 46-5 78-9"/><path d="M85 14c6-1 10 3 6 8s-9 1-7-4"/><path d="M47 17c-2 8 0 16-2 22"/><path d="M26 31c-9-4-13-15-5-21 1 6 7 7 10 3 5 7 2 20-5 19zM21 12c1 7 0 14-1 19"/><circle cx="41" cy="46" r="6"/><circle cx="54" cy="46" r="6"/><circle cx="34" cy="57" r="6"/><circle cx="47" cy="57" r="6"/><circle cx="60" cy="57" r="6"/><circle cx="40" cy="68" r="6"/><circle cx="53" cy="68" r="6"/><circle cx="47" cy="79" r="6"/></svg>`;
@@ -99,6 +100,7 @@
     { id:'images', label:'Wine images', icon:'image' },
     { id:'orders', label:'Orders', icon:'bag', badge:()=>ORDERS.filter(o=>o.status==='new').length },
     { id:'payments', label:'Payments', icon:'card' },
+    { id:'settings', label:'Store settings', icon:'settings' },
     { sec:'Grow' },
     { id:'plan', label:'Plans & Cellar Door', icon:'passport' },
     { id:'insights', label:'Insights', icon:'chart' },
@@ -157,6 +159,7 @@
           <div id="screen-cellar" class="screen"></div>
           <div id="screen-orders" class="screen"></div>
           <div id="screen-payments" class="screen"></div>
+          <div id="screen-settings" class="screen"></div>
           <div id="screen-upload" class="screen"></div>
           <div id="screen-insights" class="screen"></div>
           <div id="screen-integrations" class="screen"></div>
@@ -306,39 +309,15 @@
           <tbody id="wines-body">${WINES.map(wineRow).join('')}</tbody>
         </table></div>
       </div>
-      <div style="margin-top:14px;font-size:12.5px;color:var(--muted)">${ic('check',13,'var(--green)')} Changes save instantly and sync to the consumer app, the shop and your cellar-door listing.</div>
-      <div class="card card-pad" style="margin-top:18px" id="fulfil-card">
-        <div style="display:flex;align-items:flex-start;gap:16px;flex-wrap:wrap">
-          <div style="flex:1;min-width:260px">
-            <div class="card-title" style="margin-bottom:4px">How you ship · fulfilment profile</div>
-            <div style="font-size:12.5px;color:var(--ink-soft);line-height:1.55">This sets how the AIWine cart sells your wines. <b>Any quantity</b> — customers buy 1+ bottles ($12 delivery under 6, free on a Discovery Six). <b>Sixes &amp; twelves</b> — you pack full cartons only; the cart requires multiples of 6 and the AI suggests wines from your range to complete each carton.</div>
-          </div>
-          <div style="display:flex;flex-direction:column;gap:8px;min-width:210px" id="fulfil-opts">
-            <label style="display:flex;align-items:center;gap:9px;font-size:13.5px;cursor:pointer"><input type="radio" name="fulfil" value="any"> Any quantity (1+ bottles)</label>
-            <label style="display:flex;align-items:center;gap:9px;font-size:13.5px;cursor:pointer"><input type="radio" name="fulfil" value="cases"> Sixes &amp; twelves only</label>
-          </div>
+      <div style="margin-top:14px;font-size:12.5px;color:var(--muted)">${ic('check',13,'var(--green)')} Changes save instantly and sync to the app, the shop and your cellar-door listing.</div>
+      <div class="card card-pad" style="margin-top:18px;display:flex;align-items:center;gap:16px;flex-wrap:wrap">
+        <div style="flex:1;min-width:260px">
+          <div class="card-title" style="margin-bottom:4px">How you ship &amp; case deals</div>
+          <div style="font-size:12.5px;color:var(--ink-soft);line-height:1.55">Fulfilment profile, free-delivery threshold, case discounts, minimum order and mixed cases now live in one place.</div>
         </div>
+        <button class="btn" data-go="settings">${ic('settings',15)} Store settings</button>
       </div>`;
     el.querySelector('#add2').addEventListener('click', addWineModal);
-    // fulfilment profile — writes to Supabase when live (portal → website/app),
-    // localStorage in demo
-    (function(){
-      const FKEY='aiwine-portal:fulfilment';
-      const live = PStore.mode==='live';
-      let cur='any';
-      if(live){ cur=PStore.fulfilment||'any'; }
-      else { try{ cur=localStorage.getItem(FKEY)||'any'; }catch(e){} }
-      el.querySelectorAll('input[name=fulfil]').forEach(r=>{
-        r.checked = r.value===cur;
-        r.addEventListener('change', async ()=>{
-          if(live){
-            try{ await PStore.setFulfilment(r.value); }
-            catch(e){ toast('Could not save — try again'); r.checked=false; el.querySelector(`input[name=fulfil][value="${cur}"]`).checked=true; return; }
-          } else { try{ localStorage.setItem(FKEY,r.value); }catch(e){} }
-          cur=r.value;
-          toast(r.value==='cases' ? 'Saved — your wines now sell in 6s & 12s on AIWine' : 'Saved — customers can buy any quantity'); });
-      });
-    })();
     bindWineRows(el); bindGo(el);
   };
   function wineRow(w){
@@ -821,6 +800,156 @@
     el.innerHTML = `<div class="page-head"><div><div class="eyebrow">Demand signals</div><h1 class="page-title"><em>Insights</em>.</h1><div class="sub-line">Your own data is free. Grow adds the regional &amp; national picture.</div></div>${tabs}</div>${body}`;
     el.querySelectorAll('[data-scope]').forEach(b=>b.addEventListener('click',()=>{ el._scope=b.dataset.scope; RENDER.insights(el); }));
     const gp=el.querySelector('#go-plan'); if(gp) gp.addEventListener('click',()=>go('plan'));
+  };
+
+  // ---------- Store settings ----------
+  const SET_KEY = 'aiwine-portal:store-settings';
+  const SET_DEFAULTS = { fulfil:'any', freeThreshold:6, dozenOn:false, dozenRate:10, tiers:[], minOrder:1, mixed:true, paused:false, pausedUntil:'', allocOn:false, allocCap:6, allocWines:[], pickup:true, giftMsg:false, giftWrap:false };
+  function loadSet(){ let s={}; try{ s=JSON.parse(localStorage.getItem(SET_KEY))||{}; }catch(e){} const o=Object.assign({}, SET_DEFAULTS, s); if(PStore.mode==='live'){ Object.assign(o, PStore.storeSettings||{}); o.fulfil = PStore.fulfilment || o.fulfil; } return o; }
+  function saveSet(s){ try{ localStorage.setItem(SET_KEY, JSON.stringify(s)); }catch(e){} }
+
+  RENDER.settings = el => {
+    const s = el._set || (el._set = loadSet());
+    const rerender = () => { RENDER.settings(el); };
+    const seg = (name, val, opts) => `<div class="seg" data-seg="${name}">${opts.map(o=>`<button data-val="${o[0]}" class="${String(val)===String(o[0])?'on':''}">${o[1]}</button>`).join('')}</div>`;
+    const sw = (name, on) => `<label class="sw"><input type="checkbox" data-sw="${name}" ${on?'checked':''}><span class="tr"></span></label>`;
+
+    el.innerHTML = `
+      <div class="page-head">
+        <div><div class="eyebrow">Your winery</div><h1 class="page-title">Store <em>settings</em>.</h1>
+        <div class="sub-line">How your wines sell on AIWine. Each setting syncs to the shop, the app and your cellar-door listing.</div></div>
+      </div>
+
+      <div class="set-group">
+        <div class="gh"><span class="eyebrow">Selling &amp; cases</span><span class="gl"></span></div>
+        <div class="set-card">
+
+          <div class="set-row">
+            <div class="info"><h3>How you ship · fulfilment profile</h3>
+              <p><b>ANY QUANTITY</b> lets customers buy 1+ bottles ($12 delivery under six). <b>SIXES &amp; TWELVES ONLY</b> means your wines always ship as complete cartons — the AI sommelier helps the customer fill the case.</p></div>
+            <div class="set-ctl">${seg('fulfil', s.fulfil, [['any','Any quantity'],['cases','6s & 12s only']])}</div>
+          </div>
+
+          <div class="set-row">
+            <div class="info"><h3>Free-delivery threshold <span class="funded win">Winery-funded</span></h3>
+              <p>Where your winery-funded free delivery kicks in. Most choose six (the Discovery Six); pick twelve if you'd rather only cover freight on a full case.</p></div>
+            <div class="set-ctl">${seg('freeThreshold', s.freeThreshold, [[6,'6 bottles'],[12,'12 bottles']])}</div>
+          </div>
+
+          <div class="set-row">
+            <div class="info"><h3>Discovery Dozen discount <span class="funded win">Winery-funded</span></h3>
+              <p>Reward a full case of 12 with a discount off the wine. Free delivery on 12 applies either way. <b>Off by default</b>; turn it on and choose the rate.</p></div>
+            <div class="set-ctl">${sw('dozenOn', s.dozenOn)}
+              <div class="sub-ctl ${s.dozenOn?'':'dim'}">Rate <select data-sel="dozenRate">${[5,10,12.5,15,20].map(r=>`<option ${s.dozenRate==r?'selected':''}>${r}%</option>`).join('')}</select></div>
+            </div>
+          </div>
+
+          <div class="set-row">
+            <div class="info"><h3>Volume tiers <span class="funded win">Winery-funded</span></h3>
+              <p>Optional deeper case deals for bigger orders — e.g. 15% at two dozen. Leave empty to keep it simple.</p></div>
+            <div class="set-ctl"><div class="tiers">
+              ${(s.tiers||[]).map((t,i)=>`<div class="tier"><input type="number" data-tier-pct="${i}" value="${t.pct}" style="width:52px"/>% at <input type="number" data-tier-btls="${i}" value="${t.btls}" min="24" step="6"/> btls <span class="x" data-tier-x="${i}">✕</span></div>`).join('')}
+              <button class="btn sm ghost" data-tier-add>+ Add tier</button>
+            </div></div>
+          </div>
+
+          <div class="set-row">
+            <div class="info"><h3>Minimum order</h3>
+              <p>Fewest bottles a customer must buy from your winery before checkout. Set to 1 for no minimum.</p></div>
+            <div class="set-ctl"><span class="stepper"><button data-step="minOrder" data-d="-1">−</button><input data-num="minOrder" value="${s.minOrder}"><button data-step="minOrder" data-d="1">+</button></span></div>
+          </div>
+
+          <div class="set-row">
+            <div class="info"><h3>Mixed cases</h3>
+              <p>Allow customers to mix your different wines into one case. Turn off if a case must be a single wine.</p></div>
+            <div class="set-ctl">${sw('mixed', s.mixed)}</div>
+          </div>
+
+        </div>
+      </div>
+
+      <div class="set-group">
+        <div class="gh"><span class="eyebrow">Availability</span><span class="gl"></span></div>
+        <div class="set-card">
+
+          <div class="set-row">
+            <div class="info"><h3>Pause selling · holiday mode</h3>
+              <p>Temporarily stop taking orders — over vintage or a break — without unpublishing your wines. They reappear the moment you switch it back on.</p></div>
+            <div class="set-ctl">${sw('paused', s.paused)}
+              <div class="sub-ctl ${s.paused?'':'dim'}">Until <input type="date" data-date="pausedUntil" value="${s.pausedUntil||''}"></div>
+            </div>
+          </div>
+
+          <div class="set-row">
+            <div class="info"><h3>Per-wine allocation cap</h3>
+              <p>Limit how many bottles of a scarce wine one customer can buy per order. Turn on, set the cap, and choose which wines it applies to.</p></div>
+            <div class="set-ctl">${sw('allocOn', s.allocOn)}
+              <div class="sub-ctl ${s.allocOn?'':'dim'}">Max <span class="stepper"><button data-step="allocCap" data-d="-1">−</button><input data-num="allocCap" value="${s.allocCap}"><button data-step="allocCap" data-d="1">+</button></span> / order</div>
+              ${s.allocOn?`<div class="alloc-wines">${(WINES.length?WINES:[{id:'demo',name:'Add wines to choose'}]).map(w=>`<label><input type="checkbox" data-alloc="${w.id}" ${(s.allocWines||[]).indexOf(String(w.id))>=0?'checked':''}> ${esc(w.name)}</label>`).join('')}</div>`:''}
+            </div>
+          </div>
+
+          <div class="set-row">
+            <div class="info"><h3>Local pickup · cellar-door collection</h3>
+              <p>Offer a $0 “collect in person” option at checkout for locals — no freight, straight from your cellar door.</p></div>
+            <div class="set-ctl">${sw('pickup', s.pickup)}</div>
+          </div>
+
+        </div>
+      </div>
+
+      <div class="set-group">
+        <div class="gh"><span class="eyebrow">Presentation &amp; extras</span><span class="gl"></span></div>
+        <div class="set-card">
+
+          <div class="set-row">
+            <div class="info"><h3>Gift message</h3>
+              <p>Let customers add a personal gift message to orders from your winery.</p></div>
+            <div class="set-ctl">${sw('giftMsg', s.giftMsg)}</div>
+          </div>
+
+          <div class="set-row">
+            <div class="info"><h3>Gift wrap</h3>
+              <p>Offer gift wrapping at checkout for orders from your winery.</p></div>
+            <div class="set-ctl">${sw('giftWrap', s.giftWrap)}</div>
+          </div>
+
+          <div class="set-row">
+            <div class="info"><h3>AIWine subscriber discount <span class="funded">AIWine-funded</span></h3>
+              <p>App subscribers get an extra 10% — funded by AIWine, never a cost to you. Shown here so you can see every discount a customer might receive.</p></div>
+            <div class="set-ctl"><span class="pill in">Always on · AIWine</span></div>
+          </div>
+
+        </div>
+      </div>
+
+      <div class="save-bar">
+        <span class="note">${ic('check',14,'var(--green)')} Changes save as you go and sync to the shop, the app &amp; your cellar-door listing.</span>
+        <div style="display:flex;gap:10px"><button class="btn ghost" id="set-reset">Reset</button><button class="btn primary" id="set-save">Save settings</button></div>
+      </div>`;
+
+    const persist = async (toastMsg) => {
+      saveSet(s);
+      if(PStore.mode==='live'){
+        try{ await PStore.setFulfilment(s.fulfil); await PStore.setStoreSettings(s); }
+        catch(e){ toast('Saved locally — live sync failed, retry'); return; }
+      }
+      if(toastMsg) toast(toastMsg);
+    };
+    el.querySelectorAll('[data-seg]').forEach(g=>g.addEventListener('click',e=>{ const b=e.target.closest('[data-val]'); if(!b) return; let v=b.dataset.val; if(g.dataset.seg==='freeThreshold') v=+v; s[g.dataset.seg]=v; rerender(); persist('Saved'); }));
+    el.querySelectorAll('[data-sw]').forEach(c=>c.addEventListener('change',()=>{ s[c.dataset.sw]=c.checked; rerender(); persist('Saved'); }));
+    el.querySelectorAll('[data-sel]').forEach(sel=>sel.addEventListener('change',()=>{ s[sel.dataset.sel]=parseFloat(sel.value); persist('Saved'); }));
+    el.querySelectorAll('[data-date]').forEach(d=>d.addEventListener('change',()=>{ s[d.dataset.date]=d.value; persist('Saved'); }));
+    el.querySelectorAll('[data-num]').forEach(n=>n.addEventListener('change',()=>{ s[n.dataset.num]=Math.max(n.dataset.num==='minOrder'?1:1,+n.value||1); rerender(); persist('Saved'); }));
+    el.querySelectorAll('[data-step]').forEach(btn=>btn.addEventListener('click',()=>{ const k=btn.dataset.step; s[k]=Math.max(1,(+s[k]||1)+(+btn.dataset.d)); rerender(); persist('Saved'); }));
+    el.querySelectorAll('[data-alloc]').forEach(c=>c.addEventListener('change',()=>{ const id=c.dataset.alloc; s.allocWines=s.allocWines||[]; const i=s.allocWines.indexOf(id); if(c.checked&&i<0)s.allocWines.push(id); else if(!c.checked&&i>=0)s.allocWines.splice(i,1); persist('Saved'); }));
+    const tadd=el.querySelector('[data-tier-add]'); if(tadd) tadd.addEventListener('click',()=>{ s.tiers=s.tiers||[]; s.tiers.push({pct:15,btls:24}); rerender(); persist('Saved'); });
+    el.querySelectorAll('[data-tier-x]').forEach(x=>x.addEventListener('click',()=>{ s.tiers.splice(+x.dataset.tierX,1); rerender(); persist('Saved'); }));
+    el.querySelectorAll('[data-tier-pct]').forEach(inp=>inp.addEventListener('change',()=>{ s.tiers[+inp.dataset.tierPct].pct=+inp.value||0; persist('Saved'); }));
+    el.querySelectorAll('[data-tier-btls]').forEach(inp=>inp.addEventListener('change',()=>{ s.tiers[+inp.dataset.tierBtls].btls=Math.max(24,+inp.value||24); persist('Saved'); }));
+    el.querySelector('#set-save').addEventListener('click',()=>persist('Settings saved'));
+    el.querySelector('#set-reset').addEventListener('click',()=>{ if(confirm('Reset store settings to defaults?')){ el._set=Object.assign({},SET_DEFAULTS); saveSet(el._set); rerender(); toast('Reset to defaults'); } });
+    bindGo(el);
   };
 
   RENDER.integrations = el => {

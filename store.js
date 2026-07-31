@@ -43,6 +43,31 @@
       if (error) throw new Error(error.message);
       const w = wineries.find(x => x.id === wineryId); if (w) w.fulfilment = profile;
     },
+    // Full per-winery store settings (freeThreshold, minOrder, mixed, paused,
+    // pausedUntil, dozenOn, dozenRate, allocOn, allocCap, allocWines, pickup,
+    // giftMsg, giftWrap). Persisted via the set_store_settings RPC when live.
+    get storeSettings() {
+      const w = wineries.find(x => x.id === wineryId) || {};
+      return {
+        freeThreshold: w.free_threshold ?? 6, minOrder: w.min_order ?? 1,
+        mixed: w.mixed_cases ?? true, paused: !!w.paused, pausedUntil: w.paused_until || '',
+        dozenOn: !!w.dozen_on, dozenRate: (w.dozen_rate ?? 10),
+        allocOn: !!w.alloc_on, allocCap: w.alloc_cap ?? 6, allocWines: w.alloc_wines || [],
+        pickup: w.local_pickup ?? true, giftMsg: !!w.gift_message, giftWrap: !!w.gift_wrap,
+      };
+    },
+    async setStoreSettings(s) {
+      const { error } = await sb.rpc('set_store_settings', { p_winery: wineryId, p_settings: s });
+      if (error) throw new Error(error.message);
+      const w = wineries.find(x => x.id === wineryId);
+      if (w) Object.assign(w, {
+        free_threshold: s.freeThreshold, min_order: s.minOrder, mixed_cases: s.mixed,
+        paused: s.paused, paused_until: s.pausedUntil || null, dozen_on: s.dozenOn,
+        dozen_rate: s.dozenRate, alloc_on: s.allocOn, alloc_cap: s.allocCap,
+        alloc_wines: s.allocWines, local_pickup: s.pickup, gift_message: s.giftMsg, gift_wrap: s.giftWrap,
+        fulfilment: s.fulfil || w.fulfilment,
+      });
+    },
     get planCellarDoor() { const w = wineries.find(x => x.id === wineryId); return !!(w && w.cellarDoorActive); },
     get planGrow() { const w = wineries.find(x => x.id === wineryId); return !!(w && w.growActive); },
     // redeem an activation code for the ACTIVE winery → returns the feature it unlocked
@@ -244,6 +269,15 @@
     if (!ids.length) { wineryId = null; wineries = []; return; }
     const { data: ws } = await sb.from('wineries').select('id,name,region,"ordersEmail","cellarDoorActive","growActive",fulfilment').in('id', ids).order('name');
     wineries = ws || ids.map(id => ({ id, name: 'Your winery', region: '' }));
+    // Store-settings columns load separately + defensively: if the migration
+    // (13-store-settings.sql) hasn't been run yet, this select errors and we
+    // simply skip it rather than breaking winery loading.
+    try {
+      const { data: sset, error: sErr } = await sb.from('wineries')
+        .select('id,free_threshold,min_order,mixed_cases,paused,paused_until,dozen_on,dozen_rate,alloc_on,alloc_cap,alloc_wines,local_pickup,gift_message,gift_wrap')
+        .in('id', ids);
+      if (!sErr && sset) sset.forEach(s => { const w = wineries.find(x => x.id === s.id); if (w) Object.assign(w, s); });
+    } catch (e) { /* columns not present yet — settings stay at defaults */ }
     let pick = null;
     try { pick = localStorage.getItem(ACTIVE_KEY); } catch (e) {}
     const active = wineries.find(x => x.id === pick) || wineries[0];
