@@ -111,6 +111,7 @@
   function shell(){
     const live = PStore.mode==='live';
     document.getElementById('app').innerHTML = `
+      <a href="#main" class="skip-link">Skip to content</a>
       <aside class="side" id="side">
         <div class="side-top">
           <div class="wordmark">AI<span class="dot"></span>Wine<span class="sfx">Partner</span></div>
@@ -144,7 +145,7 @@
       <div class="main">
         <div class="topbar">
           <div style="display:flex;align-items:center;gap:14px">
-            <button class="btn-quiet menu-btn" id="menu">${ic('menu',20)}</button>
+            <button class="btn-quiet menu-btn" id="menu" aria-label="Open menu">${ic('menu',20)}</button>
             <span class="demo">${live?esc((PStore.wineryRegion?PStore.wineryName+' · '+PStore.wineryRegion:PStore.wineryName)||'Live'):'Demo · sample data'}</span>
           </div>
           <div class="actions">
@@ -152,7 +153,7 @@
             <button class="btn sm ghost" id="signout">Sign out</button>`:''}
           </div>
         </div>
-        <div class="content">
+        <div class="content" id="main" role="main" tabindex="-1">
           <div id="screen-dashboard" class="screen"></div>
           <div id="screen-wines" class="screen"></div>
           <div id="screen-images" class="screen"></div>
@@ -206,9 +207,12 @@
     document.querySelectorAll('.screen').forEach(s=>s.classList.remove('on'));
     const el = $('#screen-'+id); if(!el){ console.warn('no screen for',id); return; } el.classList.add('on');
     if(RENDER[id]) RENDER[id](el);
+    el.querySelectorAll('table.tbl thead th').forEach(th=>{ if(th.textContent.trim()) th.setAttribute('scope','col'); });
     $('#side').classList.remove('open');
     if(!$('#modal').classList.contains('open')) $('#scrim').classList.remove('open');
     $('.content').scrollTo?.(0,0); window.scrollTo(0,0);
+    // Move focus to the new page heading so keyboard/SR users land in the fresh content.
+    const h=el.querySelector('h1.page-title'); if(h){ h.setAttribute('tabindex','-1'); h.focus({preventScroll:true}); }
   }
 
   // ---------- screens ----------
@@ -327,7 +331,7 @@
       <td><span class="stepper"><button data-dec>−</button><input type="number" min="0" value="${w.qty}" data-qty><button data-inc>+</button></span></td>
       <td data-stock>${stockPill(stkOf(w))}</td>
       <td class="r mono" style="font-size:12px;color:var(--muted)">${w.scans||'—'}</td>
-      <td class="r"><button class="btn-quiet" data-del title="Remove">${ic('x',16)}</button></td>
+      <td class="r"><button class="btn-quiet" data-del title="Remove" aria-label="Remove ${esc(w.name)}">${ic('x',16)}</button></td>
     </tr>`;
   }
   function bindWineRows(el){
@@ -365,7 +369,7 @@
           <div style="font-size:12.5px;color:var(--ink-soft)">New orders for this winery are emailed here the moment they land. Each winery has its own address.</div>
         </div>
         <div style="display:flex;gap:8px;align-items:center">
-          <input id="oe-mail" type="email" value="${esc(PStore.ordersEmail||'')}" placeholder="orders@yourwinery.co.nz" style="width:240px;padding:9px 12px;border:1px solid var(--line);border-radius:8px;background:var(--card-2);font-size:13px">
+          <input id="oe-mail" type="email" aria-label="Order notification email" value="${esc(PStore.ordersEmail||'')}" placeholder="orders@yourwinery.co.nz" style="width:240px;padding:9px 12px;border:1px solid var(--line);border-radius:8px;background:var(--card-2);font-size:13px">
           <button class="btn sm primary" id="oe-save">Save</button>
         </div>
       </div>`:''}`;
@@ -607,7 +611,7 @@
           <button class="btn" data-pay="49">Founding rate \u00b7 $49 first year</button>
         </div>
         <div style="display:flex;gap:8px;align-items:center;max-width:400px">
-          <input id="code" placeholder="Have an activation code?" style="flex:1;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:var(--card-2);font-size:14px">
+          <input id="code" aria-label="Activation code" placeholder="Have an activation code?" style="flex:1;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:var(--card-2);font-size:14px">
             <button class="btn" id="act-code">Apply</button>
         </div>
         <div style="font-size:12px;color:var(--muted);margin-top:12px">Pay by card — secure Stripe checkout, activates immediately. No invoices, cancel anytime. GST receipt emailed. <a href="#" id="plan-refresh" style="color:var(--claret)">Just paid? Check activation</a></div>
@@ -1048,7 +1052,7 @@
   // ---------- add wine modal ----------
   function addWineModal(){
     $('#modal').innerHTML=`
-      <div class="modal-head"><h2>Add a bottle</h2><button class="btn-quiet" id="m-x">${ic('x',18)}</button></div>
+      <div class="modal-head"><h2>Add a bottle</h2><button class="btn-quiet" id="m-x" aria-label="Close">${ic('x',18)}</button></div>
       <div class="modal-body">
         <div class="field"><label>Wine name</label><input id="f-name" placeholder="e.g. Crimson Pinot Noir" autofocus></div>
         <div class="grid-2">
@@ -1083,13 +1087,16 @@
       PStore.addWine(w); closeModal(); go('wines'); toast('Added · '+name+' is live on AIWine 🍷');
     };
   }
-  function openModal(){ $('#scrim').classList.add('open'); $('#modal').classList.add('open'); }
-  function closeModal(){ $('#scrim').classList.remove('open'); $('#modal').classList.remove('open'); }
+  function openModal(){ _modalLastFocus=document.activeElement; $('#scrim').classList.add('open'); const m=$('#modal'); m.classList.add('open'); m.setAttribute('role','dialog'); m.setAttribute('aria-modal','true'); document.addEventListener('keydown',_modalKeydown); setTimeout(()=>{ const f=_modalFocusables(); (f[0]||m).focus(); },40); }
+  function closeModal(){ $('#scrim').classList.remove('open'); const m=$('#modal'); m.classList.remove('open'); document.removeEventListener('keydown',_modalKeydown); if(_modalLastFocus&&document.contains(_modalLastFocus)){ try{ _modalLastFocus.focus(); }catch(e){} } _modalLastFocus=null; }
+  let _modalLastFocus=null;
+  function _modalFocusables(){ const m=$('#modal'); if(!m) return []; if(!m.hasAttribute('tabindex')) m.setAttribute('tabindex','-1'); return Array.from(m.querySelectorAll('a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])')).filter(el=>el.offsetParent!==null); }
+  function _modalKeydown(e){ if(e.key==='Escape'){ e.preventDefault(); closeModal(); return; } if(e.key!=='Tab') return; const f=_modalFocusables(); if(!f.length) return; const first=f[0],last=f[f.length-1],a=document.activeElement; const m=$('#modal'); if(!m.contains(a)){ e.preventDefault(); (e.shiftKey?last:first).focus(); return; } if(e.shiftKey&&a===first){ e.preventDefault(); last.focus(); } else if(!e.shiftKey&&a===last){ e.preventDefault(); first.focus(); } }
 
   // ---------- add ANOTHER winery (multi-winery logins, e.g. wine groups) ----------
   function addWineryModal(){
     $('#modal').innerHTML=`
-      <div class="modal-head"><h2>Add another winery</h2><button class="btn-quiet" id="m-x">${ic('x',18)}</button></div>
+      <div class="modal-head"><h2>Add another winery</h2><button class="btn-quiet" id="m-x" aria-label="Close">${ic('x',18)}</button></div>
       <div class="modal-body">
         <div style="font-size:13px;color:var(--ink-soft);margin-bottom:2px">Manage several wineries from this one login. Each addition is reviewed by AIWine (usually within a business day) — you'll see it in the switcher once approved.</div>
         <div class="field"><label>Winery name</label><input id="awx-name" placeholder="e.g. Mt Difficulty"></div>
