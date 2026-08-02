@@ -1,0 +1,16 @@
+{
+  "name": "aiwine-ci",
+  "version": "1.0.0",
+  "private": true,
+  "description": "AIWine pre-deploy smoke suite (Playwright).",
+  "scripts": {
+    "serve": "npx --yes http-server ../site-final -p 4321 -c-1 --silent",
+    "test": "playwright test",
+    "test:headed": "playwright test --headed",
+    "report": "playwright show-report"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.47.0",
+    "http-server": "^14.1.1"
+  }
+}
