@@ -100,11 +100,11 @@
   const NAV = [
     { sec:'Manage' },
     { id:'dashboard', label:'Dashboard', icon:'grid' },
+    { id:'orders', label:'Orders', icon:'bag', badge:()=>ORDERS.filter(o=>o.status==='new').length },
     { id:'wines', label:'My Wines', icon:'bottle' },
+    { id:'payments', label:'Payments', icon:'card' },
     { id:'upload', label:'Upload list', icon:'upload' },
     { id:'images', label:'Wine images', icon:'image' },
-    { id:'orders', label:'Orders', icon:'bag', badge:()=>ORDERS.filter(o=>o.status==='new').length },
-    { id:'payments', label:'Payments', icon:'card' },
     { id:'settings', label:'Store settings', icon:'settings' },
     { sec:'Grow' },
     { id:'plan', label:'Plans & Cellar Door', icon:'passport' },
@@ -234,18 +234,35 @@
     const avgOrder = paid.length?Math.round(totalSales/paid.length):0;
     const shippedN = ORDERS.filter(o=>o.status==='shipped').length;
     const omax = Math.max(1,...paid.map(o=>+o.total||0));
-    const firstRun = live && !WINES.length ? `
-      <div class="card card-pad" style="margin-bottom:20px">
-        <div class="card-title" style="margin-bottom:4px">Welcome to AIWine — let's get your range online</div>
-        <div style="font-size:13px;color:var(--ink-soft);margin-bottom:16px">About 15 minutes and your wines are in front of customers. Follow the steps in order.</div>
-        <div style="display:flex;flex-direction:column;gap:12px;font-size:13.5px">
-          <div style="display:flex;align-items:flex-start;gap:10px"><span class="pill new">1</span><div><b>Download the wine template</b> — a spreadsheet with the columns we need (including <b>Region</b>) and three greyed example rows to guide you.<div style="margin-top:8px"><a class="btn" href="AIWine Wine Upload Template.xlsx" download="AIWine Wine Upload Template.xlsx" style="justify-content:center;display:inline-flex">${ic('download',15)} Download template</a></div></div></div>
-          <div style="display:flex;align-items:flex-start;gap:10px"><span class="pill new">2</span><div><b>Fill it in</b> — one row per wine. Delete the grey example rows. Set a <b>Region</b> for every wine or it won't show on AIWine's regional pages.</div></div>
-          <div style="display:flex;align-items:flex-start;gap:10px"><span class="pill new">3</span><div><b>Upload it back</b> — drop the file in and we'll preview it before publishing. <a href="#" data-go="upload" style="color:var(--claret);font-weight:600">Start upload →</a></div></div>
-          <div style="display:flex;align-items:flex-start;gap:10px"><span class="pill new">4</span><div><b>Add bottle images &amp; fine-tune</b> — check prices &amp; stock in <a href="#" data-go="wines" style="color:var(--claret);font-weight:600">My Wines</a>, and add label photos in <a href="#" data-go="images" style="color:var(--claret);font-weight:600">Wine images</a>.</div></div>
-          <div style="display:flex;align-items:flex-start;gap:10px"><span class="pill new">5</span><div><b>Optional upgrades</b> — <b>Virtual Cellar Door</b> (your story, hours &amp; photos on AIWine) and <b>Grow</b> (scan insights &amp; integrations), <b>$95/yr each</b>. Free uploads &amp; orders stay free forever. <a href="#" data-go="plan" style="color:var(--claret);font-weight:600">See plans →</a></div></div>
+    // ---- Getting-started checklist (onboarding sequence, state-aware) ----
+    const gsKey = 'aiwine-portal:gs-dismissed:'+((PStore&&PStore.wineryId)||'demo');
+    let gsDismissed=false; try{ gsDismissed=localStorage.getItem(gsKey)==='1'; }catch(e){}
+    const steps = [
+      { done: termsAccepted(), label:'Agree to the Winery Terms & Conditions', go:'upload', cta:'Review & agree' },
+      { done: WINES.length>0, label:'Upload your wine range', go:'upload', cta:'Upload list' },
+      { done: WINES.some(w=>w.img||w.image), label:'Add bottle / label images', go:'images', cta:'Add images' },
+      { done: !!(PStore&&PStore.ordersEmail), label:'Set fulfilment & order-notification email', go:'settings', cta:'Store settings' },
+      { done: false, alwaysOpen:true, label:'Email bank account & GST number for payouts', go:'payments', cta:'How payouts work' },
+    ];
+    const doneN = steps.filter(s=>s.done).length;
+    const allCore = steps.filter(s=>!s.alwaysOpen).every(s=>s.done);
+    const showGS = !(allCore && gsDismissed);
+    const firstRun = !showGS ? '' : `
+      <div class="card card-pad" style="margin-bottom:20px;border-left:3px solid ${allCore?'var(--green)':'var(--claret)'}">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap">
+          <div><div class="card-title" style="margin-bottom:4px">${allCore?'You\u2019re all set up':'Getting started'}</div>
+          <div style="font-size:13px;color:var(--ink-soft)">${allCore?'Your range is live. One last thing before your first payout \u2014 see below.':'A few steps and your wines are in front of customers. Follow them in order.'}</div></div>
+          <span class="pill ${allCore?'in':'new'}" style="align-self:center">${doneN}/${steps.filter(s=>!s.alwaysOpen).length} done</span>
         </div>
-      </div>` : '';
+        <div style="display:flex;flex-direction:column;gap:2px;margin-top:16px">
+          ${steps.map((s,i)=>`<div style="display:flex;align-items:center;gap:12px;padding:11px 0;border-top:${i?'1px solid var(--line)':'none'}">
+            <span style="flex:none;width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;${s.done?'background:var(--green);color:#fff':'background:#eee4d4;color:var(--muted)'}">${s.done?ic('check',13,'#fff'):(i+1)}</span>
+            <div style="flex:1;font-size:13.5px;${s.done?'color:var(--muted);text-decoration:line-through':'color:var(--ink)'}">${s.label}</div>
+            ${s.done?'':`<button class="btn sm ghost" data-go="${s.go}">${esc(s.cta)} \u2192</button>`}
+          </div>`).join('')}
+        </div>
+        ${allCore?`<div style="margin-top:14px"><button class="btn sm ghost" id="gs-dismiss">Hide this checklist</button></div>`:''}
+      </div>`;
     el.innerHTML = `
       <div class="page-head">
         <div><div class="eyebrow">Good morning</div><h1 class="page-title">Here's your <em>week</em>.</h1>
@@ -302,6 +319,7 @@
           </div>
         </div>
       </div>`;
+    const gsd=el.querySelector('#gs-dismiss'); if(gsd) gsd.addEventListener('click',()=>{ try{ localStorage.setItem(gsKey,'1'); }catch(e){} RENDER.dashboard(el); toast('Checklist hidden'); });
     bindGo(el);
   };
 
