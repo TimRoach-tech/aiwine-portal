@@ -193,12 +193,16 @@
       if (LIVE) {
         const db = Object.assign({}, patch);
         if (db.qty !== undefined) { db.stock = db.qty; delete db.qty; } // table column is `stock`
+        db.updated_by = Store.userEmail || null;                        // who + when (provenance)
+        db.updated_at = new Date().toISOString();
+        if (w) { w.updatedBy = db.updated_by; w.updatedAt = db.updated_at; }
         await sb.from('wines').update(db).eq('id', id);
       }
     },
     async addWine(w) {
       Store.wines.unshift(w);
       if (LIVE) {
+        const who = Store.userEmail || null, now = new Date().toISOString();
         const row = {
           name: w.name, variety: w.variety, colour: w.colour || null, style: w.style || null,
           vintage: w.vintage, price: w.price, stock: w.qty, organic: !!w.organic,
@@ -206,7 +210,9 @@
           awards: w.awards ? String(w.awards).split(';').map(s => s.trim()).filter(Boolean) : null,
           region: w.region || wineryRegion, "subRegion": w.subRegion || null,
           published: true, wineryId,
+          created_by: who, created_at: now, updated_by: who, updated_at: now,
         };
+        w.createdBy = who; w.createdAt = now; w.updatedBy = who; w.updatedAt = now;
         const { data } = await sb.from('wines').insert(row).select().single();
         if (data) w.id = data.id;
       }
@@ -255,7 +261,7 @@
     },
   };
 
-  function normWine(r) { return { id: r.id, name: r.name, variety: r.variety, colour: r.colour, vintage: r.vintage, price: +r.price || 0, qty: +r.stock || +r.qty || 0, scans: +r.scans || 0 }; }
+  function normWine(r) { return { id: r.id, name: r.name, variety: r.variety, colour: r.colour, vintage: r.vintage, price: +r.price || 0, qty: +r.stock || +r.qty || 0, scans: +r.scans || 0, createdBy: r.created_by || '', createdAt: r.created_at || '', updatedBy: r.updated_by || '', updatedAt: r.updated_at || '' }; }
   function normOrder(r) {
     const items = (r.order_items || []).map(i => `${i.qty} × ${i.name}`).join(' · ');
     return { id: r.id, placedAt: rel(r.placedAt), destination: r.destination, items, total: +r.total || 0, status: r.status, gifts: r.gifts || null, method: r.method || 'deliver' };

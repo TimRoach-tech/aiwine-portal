@@ -332,7 +332,7 @@
       </div>
       <div class="card">
         <div class="tbl-wrap"><table class="tbl">
-          <thead><tr><th>Wine</th><th>Price (incl GST)</th><th>In cellar</th><th>Status</th><th class="r">Scans</th><th></th></tr></thead>
+          <thead><tr><th scope="col">Wine</th><th scope="col">Price (incl GST)</th><th scope="col">In cellar</th><th scope="col">Status</th><th scope="col" class="r">Scans</th><th scope="col"><span class="sr-only">Actions</span></th></tr></thead>
           <tbody id="wines-body">${WINES.map(wineRow).join('')}</tbody>
         </table></div>
       </div>
@@ -347,11 +347,21 @@
     el.querySelector('#add2').addEventListener('click', addWineModal);
     bindWineRows(el); bindGo(el);
   };
+  // provenance: who added / last changed a wine, and when (from the audit columns)
+  function fmtWhen(iso){ if(!iso) return ''; const d=new Date(iso); if(isNaN(d)) return ''; return d.toLocaleDateString('en-NZ',{day:'numeric',month:'short',year:'numeric'}); }
+  function provLine(w){
+    const parts=[];
+    if(w.updatedAt) parts.push('Updated '+fmtWhen(w.updatedAt)+(w.updatedBy?' · '+esc(w.updatedBy):''));
+    else if(w.createdAt) parts.push('Added '+fmtWhen(w.createdAt)+(w.createdBy?' · '+esc(w.createdBy):''));
+    if(!parts.length) return '';
+    const title = w.createdAt?('Added '+fmtWhen(w.createdAt)+(w.createdBy?' by '+esc(w.createdBy):'')):'';
+    return `<div class="wine-meta" style="font-size:10.5px;color:var(--muted);margin-top:2px" title="${title}">${parts[0]}</div>`;
+  }
   function wineRow(w){
     return `<tr data-wid="${w.id}">
-      <td><div class="wine-cell">${bottleEl(w)}<div><div class="wine-nm">${esc(w.name)}</div><div class="wine-meta">${esc(w.variety)} · ${esc(w.vintage)}</div></div></div></td>
-      <td><span class="price-edit"><span>$</span><input type="number" min="0" value="${w.price}" data-price></span></td>
-      <td><span class="stepper"><button data-dec>−</button><input type="number" min="0" value="${w.qty}" data-qty><button data-inc>+</button></span></td>
+      <td><div class="wine-cell">${bottleEl(w)}<div><div class="wine-nm">${esc(w.name)}</div><div class="wine-meta">${esc(w.variety)} · ${esc(w.vintage)}</div>${provLine(w)}</div></div></td>
+      <td><span class="price-edit"><span>$</span><input type="number" min="0" value="${w.price}" data-price aria-label="Price for ${esc(w.name)}, dollars incl GST"></span></td>
+      <td><span class="stepper"><button data-dec aria-label="Decrease stock for ${esc(w.name)}">−</button><input type="number" min="0" value="${w.qty}" data-qty aria-label="Bottles in cellar for ${esc(w.name)}"><button data-inc aria-label="Increase stock for ${esc(w.name)}">+</button></span></td>
       <td data-stock>${stockPill(stkOf(w))}</td>
       <td class="r mono" style="font-size:12px;color:var(--muted)">${w.scans||'—'}</td>
       <td class="r"><button class="btn-quiet" data-del title="Remove" aria-label="Remove ${esc(w.name)}">${ic('x',16)}</button></td>
