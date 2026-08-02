@@ -54,6 +54,11 @@
   let PLAN; try{ PLAN=JSON.parse(localStorage.getItem(PLAN_KEY))||{}; }catch(e){ PLAN={}; }
   PLAN=Object.assign({ cellarDoor:false, grow:false, story:'', hours:'', activatedVia:'' }, PLAN);
   function savePlan(){ try{ localStorage.setItem(PLAN_KEY, JSON.stringify(PLAN)); }catch(e){} }
+  // ---------- winery T&C acceptance (gates the first upload) ----------
+  const TERMS_VERSION='1.0';
+  const termsKey=()=> 'aiwine-portal:terms:'+(PStore&&PStore.wineryId?PStore.wineryId:'demo');
+  function termsAccepted(){ try{ const r=JSON.parse(localStorage.getItem(termsKey())); return !!(r&&r.version===TERMS_VERSION); }catch(e){ return false; } }
+  function acceptTerms(){ try{ localStorage.setItem(termsKey(), JSON.stringify({ version:TERMS_VERSION, at:new Date().toISOString(), by:(PStore&&PStore.userEmail)||'' })); }catch(e){} }
   const CODES={ 'FOUNDING49':{price:49,label:'Founding'}, 'WAIRARAPA':{price:0,label:'Wairarapa Association'}, 'WAIRARAPA26':{price:0,label:'Wairarapa founding 2026'} };
   const hasCellar=()=> PStore.mode==='live' ? PStore.planCellarDoor : PLAN.cellarDoor;
   const hasGrow  =()=> PStore.mode==='live' ? PStore.planGrow : PLAN.grow;
@@ -465,10 +470,24 @@
   };
 
   RENDER.upload = el => {
+    const agreed = termsAccepted();
     el.innerHTML = `
       <div class="page-head"><div><div class="eyebrow">Bulk update</div><h1 class="page-title">Upload your <em>list</em>.</h1>
       <div class="sub-line">The smoothest way is our ready-made template — it has every field (incl. tasting notes &amp; colour) with dropdowns, so your wines map first time. Download it, fill it in, drop it back.</div></div></div>
-      <div class="two">
+      <div class="card card-pad" id="terms-gate" style="margin-bottom:18px;border-left:3px solid ${agreed?'var(--green)':'var(--claret)'}">
+        <div style="display:flex;gap:14px;align-items:flex-start;flex-wrap:wrap">
+          <div style="flex:1;min-width:240px">
+            <div class="card-title" style="font-size:16px;margin-bottom:4px">${agreed?'Terms accepted':'Before you list wine'}</div>
+            <div style="font-size:13px;color:var(--ink-soft);line-height:1.6">${agreed?`You've agreed to the AIWine Winery Terms &amp; Conditions (v${TERMS_VERSION}). You can <a href="terms.html" target="_blank" style="color:var(--claret);font-weight:600">re-read them here</a> at any time.`:`Listing wine on AIWine means agreeing to our Winery Terms &amp; Conditions — how commission, payouts, fulfilment and alcohol-law responsibilities work. Please <a href="terms.html" target="_blank" style="color:var(--claret);font-weight:600">read the terms</a>, then tick to continue.`}</div>
+            ${agreed?'':`<label style="display:flex;gap:10px;align-items:flex-start;margin-top:14px;cursor:pointer;font-size:13.5px;color:var(--ink)">
+              <input type="checkbox" id="terms-agree" style="margin-top:2px;width:17px;height:17px;accent-color:var(--claret);flex:none" />
+              <span>I have read and agree to the <a href="terms.html" target="_blank" style="color:var(--claret);font-weight:600">AIWine Winery Terms &amp; Conditions</a> on behalf of my winery.</span>
+            </label>`}
+          </div>
+          ${agreed?`<span class="pill in" style="align-self:center">${ic('check',13,'var(--green)')} Agreed</span>`:''}
+        </div>
+      </div>
+      <div class="two" id="upload-body" style="${agreed?'':'opacity:.5;pointer-events:none;filter:grayscale(.3)'}" aria-disabled="${agreed?'false':'true'}">
         <div>
           <div class="drop" id="drop">
             <div class="dic">${ic('upload',26)}</div>
@@ -494,14 +513,16 @@
         </div>
       </div>`;
     const drop=el.querySelector('#drop'), file=el.querySelector('#file');
-    el.querySelector('#pick').addEventListener('click',()=>file.click());
+    const agreeBox=el.querySelector('#terms-agree');
+    if(agreeBox){ agreeBox.addEventListener('change',()=>{ if(agreeBox.checked){ acceptTerms(); toast('Terms accepted — you can upload now'); RENDER.upload(el); } }); }
+    el.querySelector('#pick').addEventListener('click',()=>{ if(!termsAccepted()){ toast('Please agree to the Terms & Conditions first'); return; } file.click(); });
     el.querySelector('#tmpl').addEventListener('click',()=>{
       if(PStore.mode==='live'){ const a=document.createElement('a'); a.href='AIWine Wine Upload Template.xlsx'; a.download='AIWine Wine Upload Template.xlsx'; a.click(); toast('Template downloaded'); return; }
       const csv='name,variety,vintage,price,stock\nCrimson Pinot Noir,Pinot Noir,2023,32,60\n'; const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'})); a.download='AIWine_range_template.csv'; a.click(); toast('Template downloaded'); });
-    file.addEventListener('change',e=>{ if(e.target.files[0]) parseFile(e.target.files[0], el); });
+    file.addEventListener('change',e=>{ if(!termsAccepted())return; if(e.target.files[0]) parseFile(e.target.files[0], el); });
     ['dragenter','dragover'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add('over');}));
     ['dragleave','drop'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove('over');}));
-    drop.addEventListener('drop',e=>{ const f=e.dataTransfer.files[0]; if(f) parseFile(f, el); });
+    drop.addEventListener('drop',e=>{ if(!termsAccepted()){ toast('Please agree to the Terms & Conditions first'); return; } const f=e.dataTransfer.files[0]; if(f) parseFile(f, el); });
   };
   function parseFile(f, el){
     const prev=el.querySelector('#preview');
