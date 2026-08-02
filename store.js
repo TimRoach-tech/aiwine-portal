@@ -207,6 +207,7 @@
           name: w.name, variety: w.variety, colour: w.colour || null, style: w.style || null,
           vintage: w.vintage, price: w.price, stock: w.qty, organic: !!w.organic,
           notes: w.notes || null, pairings: (w.pairings && w.pairings.length) ? w.pairings : null,
+          why: w.why || null,
           awards: w.awards ? String(w.awards).split(';').map(s => s.trim()).filter(Boolean) : null,
           region: w.region || wineryRegion, "subRegion": w.subRegion || null,
           published: true, wineryId,
@@ -243,13 +244,15 @@
           if (r.variety) patch.variety = r.variety;
           if (r.colour)  patch.colour  = r.colour;
           if (r.vintage) patch.vintage = +r.vintage || existing.vintage;
+          if (r.notes)   patch.notes   = r.notes;
+          if (r.why)     patch.why     = r.why;
           await Store.updateWine(existing.id, patch);
           updated++;
         } else {
           await Store.addWine({
             id: 'tmp' + Date.now() + '-' + added, name,
             variety: r.variety, colour: r.colour, style: r.style, organic: !!r.organic,
-            region: r.region, subRegion: r.subRegion, notes: r.notes,
+            region: r.region, subRegion: r.subRegion, notes: r.notes, why: r.why || '',
             pairings: r.pairings || [], awards: r.awards || '',
             vintage: +r.vintage || new Date().getFullYear(), price, qty, scans: 0,
           });
@@ -261,7 +264,7 @@
     },
   };
 
-  function normWine(r) { return { id: r.id, name: r.name, variety: r.variety, colour: r.colour, vintage: r.vintage, price: +r.price || 0, qty: +r.stock || +r.qty || 0, scans: +r.scans || 0, createdBy: r.created_by || '', createdAt: r.created_at || '', updatedBy: r.updated_by || '', updatedAt: r.updated_at || '' }; }
+  function normWine(r) { return { id: r.id, name: r.name, variety: r.variety, colour: r.colour, vintage: r.vintage, price: +r.price || 0, qty: +r.stock || +r.qty || 0, scans: +r.scans || 0, notes: r.notes || '', why: r.why || '', createdBy: r.created_by || '', createdAt: r.created_at || '', updatedBy: r.updated_by || '', updatedAt: r.updated_at || '' }; }
   function normOrder(r) {
     const items = (r.order_items || []).map(i => `${i.qty} × ${i.name}`).join(' · ');
     return { id: r.id, placedAt: rel(r.placedAt), destination: r.destination, items, total: +r.total || 0, status: r.status, gifts: r.gifts || null, method: r.method || 'deliver' };
