@@ -288,7 +288,7 @@
           <div class="card">
             <div class="card-head"><span class="card-title">New orders</span><button class="btn-quiet" data-go="orders" style="font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--brass)">View all</button></div>
             <div class="card-pad" style="padding-top:6px;padding-bottom:8px">
-              ${newOrders.length?newOrders.map(o=>`<div class="row-item"><span class="row-ic">${ic('bag',15)}</span><div class="row-bd"><div class="t"><b>${o.items}</b></div><div class="when">${o.id} · ${o.destination} · ${money(o.total)}</div></div></div>`).join(''):'<div style="color:var(--muted);font-size:13px;padding:8px 0">No new orders right now.</div>'}
+              ${newOrders.length?newOrders.map(o=>`<div class="row-item"><span class="row-ic">${ic('bag',15)}</span><div class="row-bd"><div class="t"><b>${esc(o.items)}</b></div><div class="when">${esc(o.id)} · ${esc(o.destination)} · ${money(o.total)}</div></div></div>`).join(''):'<div style="color:var(--muted);font-size:13px;padding:8px 0">No new orders right now.</div>'}
             </div>
           </div>
           <div class="card card-pad">
@@ -326,7 +326,7 @@
   };
   function wineRow(w){
     return `<tr data-wid="${w.id}">
-      <td><div class="wine-cell">${bottleEl(w)}<div><div class="wine-nm">${esc(w.name)}</div><div class="wine-meta">${w.variety} · ${w.vintage}</div></div></div></td>
+      <td><div class="wine-cell">${bottleEl(w)}<div><div class="wine-nm">${esc(w.name)}</div><div class="wine-meta">${esc(w.variety)} · ${esc(w.vintage)}</div></div></div></td>
       <td><span class="price-edit"><span>$</span><input type="number" min="0" value="${w.price}" data-price></span></td>
       <td><span class="stepper"><button data-dec>−</button><input type="number" min="0" value="${w.qty}" data-qty><button data-inc>+</button></span></td>
       <td data-stock>${stockPill(stkOf(w))}</td>
@@ -396,7 +396,7 @@
     if(msg) tags.push(`<span class="pill" title="${esc(msg)}">Gift message</span>`);
     const tagLine = tags.length?`<div style="margin-top:5px;display:flex;gap:5px;flex-wrap:wrap">${tags.join('')}</div>`:'';
     const msgLine = msg?`<div class="wine-meta" style="margin-top:4px;font-style:italic">“${esc(msg)}”</div>`:'';
-    return `<tr><td class="mono" style="font-size:12px">${o.id}<div class="wine-meta" style="margin-top:3px">${o.placedAt}</div></td><td style="font-size:13px;font-weight:600">${esc(o.items)}${tagLine}${msgLine}</td><td>${o.method==='pickup'?'Cellar-door pickup':o.destination}</td><td class="r mono">${money(o.total)}</td><td>${pill}</td><td class="r">${act}</td></tr>`;
+    return `<tr><td class="mono" style="font-size:12px">${esc(o.id)}<div class="wine-meta" style="margin-top:3px">${esc(o.placedAt)}</div></td><td style="font-size:13px;font-weight:600">${esc(o.items)}${tagLine}${msgLine}</td><td>${o.method==='pickup'?'Cellar-door pickup':esc(o.destination)}</td><td class="r mono">${money(o.total)}</td><td>${pill}</td><td class="r">${act}</td></tr>`;
   }
 
   RENDER.payments = el => {
@@ -528,12 +528,32 @@
     }
     const r=new FileReader();
     r.onload=()=>{
-      const lines=String(r.result).split(/\r?\n/).filter(x=>x.trim());
-      if(!lines.length){ prev.innerHTML='<div class="card card-pad" style="color:var(--muted)">Empty file.</div>'; return; }
-      const cells=lines.map(l=>l.split(',').map(c=>c.trim().replace(/^"|"$/g,'')));
+      const cells=parseCSV(String(r.result));
+      if(!cells.length){ prev.innerHTML='<div class="card card-pad" style="color:var(--muted)">Empty file.</div>'; return; }
       handleCells(cells, el);
     };
     r.readAsText(f);
+  }
+  // RFC-4180-aware CSV parse: commas and newlines inside "quoted" fields are kept
+  // (wine notes / pairings routinely contain commas), and "" is a literal quote.
+  // Replaces a naive split(',') that mis-aligned columns — which could publish a
+  // price or stock level into the wrong column.
+  function parseCSV(text){
+    const rows=[]; let row=[], field='', inQuotes=false;
+    text=String(text).replace(/\r\n?/g,'\n');
+    for(let i=0;i<text.length;i++){
+      const c=text[i];
+      if(inQuotes){
+        if(c==='"'){ if(text[i+1]==='"'){ field+='"'; i++; } else { inQuotes=false; } }
+        else field+=c;
+      } else if(c==='"'){ inQuotes=true; }
+      else if(c===','){ row.push(field); field=''; }
+      else if(c==='\n'){ row.push(field); rows.push(row); row=[]; field=''; }
+      else field+=c;
+    }
+    if(field.length||row.length){ row.push(field); rows.push(row); }
+    // trim each cell; drop fully-empty rows
+    return rows.map(r=>r.map(c=>c.trim())).filter(r=>r.some(c=>c!==''));
   }
   // lazy-load SheetJS for native .xlsx reading (live portal only)
   function loadXlsx(){
