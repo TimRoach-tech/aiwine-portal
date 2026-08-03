@@ -1112,6 +1112,19 @@
   RENDER.images = el => {
     const KEY='aiwine-portal:wine-images';
     const LIVE = PStore.mode==='live';
+    const BGR_KEY='aiwine-portal:bgr';
+    const bgrOn=()=>{ const c=document.getElementById('bgr-toggle'); return c?c.checked:(localStorage.getItem(BGR_KEY)!=='0'); };
+    let _bgr=null;
+    const loadBgr=()=>{ if(!_bgr) _bgr=import('https://cdn.jsdelivr.net/npm/@imgly/background-removal@1.5.5/+esm'); return _bgr; };
+    // Optional free, in-browser background removal, THEN normalize to the standard
+    // frame. Falls back to the original file if the model can't load.
+    function prep(file, cb){
+      if(!bgrOn()){ normalizeBottle(file, cb); return; }
+      toast('Removing background… (first run downloads the model, ~10s)');
+      loadBgr().then(m=>{ const fn=m.removeBackground||(m.default&&m.default.removeBackground)||m.default; return fn(file); })
+        .then(blob=>normalizeBottle(blob, cb))
+        .catch(()=>{ toast('Background removal unavailable — using the original image'); normalizeBottle(file, cb); });
+    }
     let imgs; try{ imgs=JSON.parse(localStorage.getItem(KEY))||{}; }catch(e){ imgs={}; }
     const save=()=>{ try{ localStorage.setItem(KEY,JSON.stringify(imgs)); return true; }catch(e){ return false; } };
     const slug=s=>String(s||'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
@@ -1153,7 +1166,7 @@
     // live: current photo is the wine's saved image_url; demo: localStorage map
     const imgOf = w => LIVE ? (w.image||'') : (imgs[w.id]||'');
     single.addEventListener('change',e=>{ const f=e.target.files[0]; if(!f||!target){ single.value=''; target=null; return; } const t=target; single.value=''; target=null;
-      normalizeBottle(f, res=>{
+      prep(f, res=>{
         if(LIVE){ toast('Uploading photo…'); PStore.uploadWineImage(t,res.blob).then(()=>{ WINES=PStore.wines; draw(); toast(res.transparent?'Photo uploaded — live on the site':'Uploaded — tip: a cut-out PNG (transparent background) looks cleaner than a solid box.'); }).catch(err=>{ toast('Upload failed: '+(err&&err.message||err)); }); }
         else { imgs[t]=res.dataUrl; if(save()){ draw(); toast(res.transparent?'Photo added':'Added — tip: use a cut-out PNG (transparent background) for a clean look.'); } else { delete imgs[t]; draw(); toast('Couldn’t save — photo too large for local storage.'); } }
       });
@@ -1165,7 +1178,7 @@
       const finish=()=>{ if(++done<total) return; const ok=LIVE||save(); if(LIVE){ WINES=PStore.wines; } draw();
         toast((ok?(matched+(LIVE?' uploaded':' matched')):'Couldn’t save all — storage full')+(un?' · '+un+' unmatched':'')+(opaque?' · '+opaque+' had a solid background (use cut-out PNGs)':'')+(LIVE&&ok?' — live on the site':'')); };
       arr.forEach(f=>{ const w=match(f); if(!w){ un++; finish(); return; }
-        normalizeBottle(f, res=>{ if(!res.transparent) opaque++;
+        prep(f, res=>{ if(!res.transparent) opaque++;
           if(LIVE){ PStore.uploadWineImage(w.id,res.blob).then(()=>{matched++;}).catch(()=>{un++;}).then(finish); }
           else { imgs[w.id]=res.dataUrl; matched++; finish(); }
         }); });
@@ -1174,7 +1187,7 @@
       el.innerHTML = `
         <div class="page-head"><div><div class="eyebrow">Bottle photos</div><h1 class="page-title">Wine <em>images</em>.</h1>
         <div class="sub-line">One bottle photo per wine. Drag them all in at once — we match each photo to a wine by its file name.</div></div>
-        <div style="display:flex;gap:10px"><button class="btn primary" id="pickall">${ic('upload',15)} Add photos</button></div></div>
+        <div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap"><label style="display:inline-flex;align-items:center;gap:7px;font-size:12.5px;color:var(--ink-soft);cursor:pointer"><input type="checkbox" id="bgr-toggle" ${localStorage.getItem(BGR_KEY)!=='0'?'checked':''} style="width:16px;height:16px;accent-color:var(--claret)">Auto-remove background</label><button class="btn primary" id="pickall">${ic('upload',15)} Add photos</button></div></div>
         <div class="drop" id="drop"><div class="dic">${ic('image',26)}</div><h3>Drop bottle photos here</h3><p>JPG or PNG. Name each file like the wine + vintage, e.g. <b>crimson-pinot-noir-2023.jpg</b> — it lands on the right wine automatically.<br><span style="color:var(--muted);font-size:12px">Best results: a <b>cut-out photo on a transparent background</b> (PNG), bottle upright and centred. We auto-trim, size and centre every photo to match — a solid white/checker background will show as a box.</span></p><input type="file" id="fileall" accept="image/*" multiple hidden></div>
         <div class="card" style="margin-top:18px"><div class="tbl-wrap"><table class="tbl">
           <thead><tr><th>Photo</th><th>Wine</th><th>File name to use</th><th></th></tr></thead>
@@ -1186,6 +1199,7 @@
           }).join('')}</tbody></table></div></div>`;
       el.querySelectorAll('[data-up]').forEach(b=>b.addEventListener('click',()=>{ target=b.dataset.up; single.click(); }));
       el.querySelectorAll('[data-rm]').forEach(b=>b.addEventListener('click',()=>{ if(LIVE){ PStore.removeWineImage(b.dataset.rm).then(()=>{ WINES=PStore.wines; draw(); toast('Photo removed'); }); } else { delete imgs[b.dataset.rm]; save(); draw(); } }));
+      const bt=el.querySelector('#bgr-toggle'); if(bt) bt.addEventListener('change',()=>{ try{ localStorage.setItem(BGR_KEY, bt.checked?'1':'0'); }catch(e){} });
       const fa=el.querySelector('#fileall');
       el.querySelector('#pickall').addEventListener('click',()=>fa.click());
       fa.addEventListener('change',e=>handleFiles(e.target.files));
