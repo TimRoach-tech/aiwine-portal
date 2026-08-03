@@ -1115,45 +1115,67 @@
     let imgs; try{ imgs=JSON.parse(localStorage.getItem(KEY))||{}; }catch(e){ imgs={}; }
     const save=()=>{ try{ localStorage.setItem(KEY,JSON.stringify(imgs)); return true; }catch(e){ return false; } };
     const slug=s=>String(s||'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
-    // Downscale to a small JPEG before storing — full-res photos overflow the
-    // ~5MB localStorage quota (which silently failed before, so a photo would
-    // “save” then vanish on redraw). Max 420px longest edge keeps thumbnails tiny.
-    const toDataURL=(f,cb)=>{
+    // Normalize EVERY bottle photo to one standard frame so cards look consistent:
+    // trim the empty/near-white margin, then fit the bottle into a 640×854 (3:4)
+    // TRANSPARENT PNG, centred and bottom-anchored to match the card's bottle slot.
+    // Also reports whether the source had real transparency — an opaque image shows
+    // as a box on the site, so we warn the winery to use a cut-out PNG.
+    function normalizeBottle(file, cb){
       const r=new FileReader();
       r.onload=()=>{ const img=new Image(); img.onload=()=>{
-        const max=420, sc=Math.min(1,max/Math.max(img.width,img.height));
-        const c=document.createElement('canvas'); c.width=Math.round(img.width*sc); c.height=Math.round(img.height*sc);
-        c.getContext('2d').drawImage(img,0,0,c.width,c.height);
-        try{ cb(c.toDataURL('image/jpeg',0.82)); }catch(e){ cb(r.result); }
-      }; img.onerror=()=>cb(r.result); img.src=r.result; };
-      r.readAsDataURL(f);
-    };
+        try{
+          const iw=img.width, ih=img.height;
+          const s=document.createElement('canvas'); s.width=iw; s.height=ih;
+          const sx=s.getContext('2d'); sx.drawImage(img,0,0);
+          let data=null; try{ data=sx.getImageData(0,0,iw,ih).data; }catch(e){}
+          let minX=iw,minY=ih,maxX=0,maxY=0,hasAlpha=false;
+          if(data){
+            for(let y=0;y<ih;y++){ for(let x=0;x<iw;x++){ const i=(y*iw+x)*4, a=data[i+3];
+              if(a<250) hasAlpha=true;
+              const nearWhite=data[i]>245&&data[i+1]>245&&data[i+2]>245;
+              if(a>12 && !nearWhite){ if(x<minX)minX=x; if(x>maxX)maxX=x; if(y<minY)minY=y; if(y>maxY)maxY=y; } } }
+          }
+          if(minX>maxX){ minX=0;minY=0;maxX=iw-1;maxY=ih-1; }
+          const cw=maxX-minX+1, ch=maxY-minY+1;
+          const FW=640, FH=854;
+          const scale=Math.min((FW*0.86)/cw, (FH*0.92)/ch);
+          const dw=Math.round(cw*scale), dh=Math.round(ch*scale);
+          const dx=Math.round((FW-dw)/2), dy=Math.round(FH-dh-FH*0.04);
+          const out=document.createElement('canvas'); out.width=FW; out.height=FH;
+          out.getContext('2d').drawImage(img, minX,minY,cw,ch, dx,dy,dw,dh);
+          out.toBlob(b=>{ cb({ dataUrl: out.toDataURL('image/png'), blob: b||file, transparent: hasAlpha }); }, 'image/png');
+        }catch(e){ cb({ dataUrl:r.result, blob:file, transparent:true }); }
+      }; img.onerror=()=>cb({ dataUrl:r.result, blob:file, transparent:true }); img.src=r.result; };
+      r.readAsDataURL(file);
+    }
     let target=null;
     const single=document.createElement('input'); single.type='file'; single.accept='image/*';
     // live: current photo is the wine's saved image_url; demo: localStorage map
     const imgOf = w => LIVE ? (w.image||'') : (imgs[w.id]||'');
-    single.addEventListener('change',e=>{ const f=e.target.files[0]; if(!f||!target) { single.value=''; target=null; return; } const t=target; single.value=''; target=null;
-      if(LIVE){ toast('Uploading photo…'); PStore.uploadWineImage(t,f).then(()=>{ WINES=PStore.wines; draw(); toast('Photo uploaded — live on the site'); }).catch(err=>{ toast('Upload failed: '+(err&&err.message||err)); }); }
-      else { toDataURL(f,d=>{ imgs[t]=d; if(save()){ draw(); toast('Photo added'); } else { delete imgs[t]; draw(); toast('Couldn’t save — photo too large for local storage. Try a smaller image.'); } }); }
+    single.addEventListener('change',e=>{ const f=e.target.files[0]; if(!f||!target){ single.value=''; target=null; return; } const t=target; single.value=''; target=null;
+      normalizeBottle(f, res=>{
+        if(LIVE){ toast('Uploading photo…'); PStore.uploadWineImage(t,res.blob).then(()=>{ WINES=PStore.wines; draw(); toast(res.transparent?'Photo uploaded — live on the site':'Uploaded — tip: a cut-out PNG (transparent background) looks cleaner than a solid box.'); }).catch(err=>{ toast('Upload failed: '+(err&&err.message||err)); }); }
+        else { imgs[t]=res.dataUrl; if(save()){ draw(); toast(res.transparent?'Photo added':'Added — tip: use a cut-out PNG (transparent background) for a clean look.'); } else { delete imgs[t]; draw(); toast('Couldn’t save — photo too large for local storage.'); } }
+      });
     });
     function handleFiles(files){
       const arr=[...files].filter(f=>/^image\//.test(f.type)); if(!arr.length) return;
       const match=f=>{ const base=slug(f.name.replace(/\.[^.]+$/,'')); return WINES.find(x=>{ const s1=slug(x.name+'-'+(x.vintage||'')); const s2=slug(x.name); return base===s1||base===s2||(s2&&base.indexOf(s2)>=0); }); };
-      if(LIVE){ let matched=0, un=0; toast('Uploading…');
-        Promise.all(arr.map(f=>{ const w=match(f); if(!w){ un++; return Promise.resolve(); } return PStore.uploadWineImage(w.id,f).then(()=>{matched++;}).catch(()=>{un++;}); }))
-          .then(()=>{ WINES=PStore.wines; draw(); toast(matched+' uploaded'+(un?' · '+un+' unmatched':'')+' — live on the site'); });
-        return;
-      }
-      let pending=arr.length, matched=0, un=0;
-      arr.forEach(f=>{ const w=match(f);
-        toDataURL(f,d=>{ if(w){ imgs[w.id]=d; matched++; } else un++; if(--pending===0){ const ok=save(); draw(); toast(ok?(matched+' matched'+(un?' · '+un+' unmatched':'')):'Couldn’t save — photos too large for local storage.'); } }); });
+      let done=0, matched=0, un=0, opaque=0; const total=arr.length;
+      const finish=()=>{ if(++done<total) return; const ok=LIVE||save(); if(LIVE){ WINES=PStore.wines; } draw();
+        toast((ok?(matched+(LIVE?' uploaded':' matched')):'Couldn’t save all — storage full')+(un?' · '+un+' unmatched':'')+(opaque?' · '+opaque+' had a solid background (use cut-out PNGs)':'')+(LIVE&&ok?' — live on the site':'')); };
+      arr.forEach(f=>{ const w=match(f); if(!w){ un++; finish(); return; }
+        normalizeBottle(f, res=>{ if(!res.transparent) opaque++;
+          if(LIVE){ PStore.uploadWineImage(w.id,res.blob).then(()=>{matched++;}).catch(()=>{un++;}).then(finish); }
+          else { imgs[w.id]=res.dataUrl; matched++; finish(); }
+        }); });
     }
     function draw(){
       el.innerHTML = `
         <div class="page-head"><div><div class="eyebrow">Bottle photos</div><h1 class="page-title">Wine <em>images</em>.</h1>
         <div class="sub-line">One bottle photo per wine. Drag them all in at once — we match each photo to a wine by its file name.</div></div>
         <div style="display:flex;gap:10px"><button class="btn primary" id="pickall">${ic('upload',15)} Add photos</button></div></div>
-        <div class="drop" id="drop"><div class="dic">${ic('image',26)}</div><h3>Drop bottle photos here</h3><p>JPG or PNG. Name each file like the wine + vintage, e.g. <b>crimson-pinot-noir-2023.jpg</b> — it lands on the right wine automatically.</p><input type="file" id="fileall" accept="image/*" multiple hidden></div>
+        <div class="drop" id="drop"><div class="dic">${ic('image',26)}</div><h3>Drop bottle photos here</h3><p>JPG or PNG. Name each file like the wine + vintage, e.g. <b>crimson-pinot-noir-2023.jpg</b> — it lands on the right wine automatically.<br><span style="color:var(--muted);font-size:12px">Best results: a <b>cut-out photo on a transparent background</b> (PNG), bottle upright and centred. We auto-trim, size and centre every photo to match — a solid white/checker background will show as a box.</span></p><input type="file" id="fileall" accept="image/*" multiple hidden></div>
         <div class="card" style="margin-top:18px"><div class="tbl-wrap"><table class="tbl">
           <thead><tr><th>Photo</th><th>Wine</th><th>File name to use</th><th></th></tr></thead>
           <tbody>${WINES.map(w=>{ const src=imgOf(w); const fn=slug(w.name+'-'+(w.vintage||''))+'.jpg';
