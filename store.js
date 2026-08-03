@@ -292,13 +292,16 @@
     const active = wineries.find(x => x.id === pick) || wineries[0];
     wineryId = active.id; wineryName = active.name; wineryRegion = active.region || '';
   }
+  // Load supabase-js. Prefer our vendored copy (own origin); fall back to a
+  // version-PINNED CDN (was the floating "@2" — a supply-chain risk) with
+  // crossorigin. To vendor: put supabase.min.js in portal/vendor/ (see
+  // vendor/DOWNLOAD.md).
   function loadLib() {
     return new Promise((res, rej) => {
       if (window.supabase) return res();
-      const s = document.createElement('script');
-      s.src = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js';
-      s.onload = res; s.onerror = () => rej(new Error('Could not load Supabase'));
-      document.head.appendChild(s);
+      const cdn = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js';
+      const add = (src, onerr) => { const s = document.createElement('script'); s.src = src; s.crossOrigin = 'anonymous'; s.onload = () => res(); s.onerror = onerr; document.head.appendChild(s); };
+      add('vendor/supabase.min.js', () => add(cdn, () => rej(new Error('Could not load Supabase'))));
     });
   }
 

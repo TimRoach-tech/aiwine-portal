@@ -605,14 +605,16 @@
     // trim each cell; drop fully-empty rows
     return rows.map(r=>r.map(c=>c.trim())).filter(r=>r.some(c=>c!==''));
   }
-  // lazy-load SheetJS for native .xlsx reading (live portal only)
+  // Load SheetJS for native .xlsx reading (live portal only).
+  // Prefer the VENDORED copy from our own origin (no third-party CDN trust);
+  // fall back to a version-PINNED CDN with crossorigin if it's absent.
+  // To vendor: put xlsx.full.min.js 0.18.5 in portal/vendor/ (see vendor/DOWNLOAD.md).
   function loadXlsx(){
     return new Promise((res,rej)=>{
       if(window.XLSX) return res();
-      const s=document.createElement('script');
-      s.src='https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js';
-      s.onload=res; s.onerror=()=>rej(new Error('xlsx load failed'));
-      document.head.appendChild(s);
+      const cdn='https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js';
+      const add=(src,onerr)=>{ const s=document.createElement('script'); s.src=src; s.crossOrigin='anonymous'; s.onload=()=>res(); s.onerror=onerr; document.head.appendChild(s); };
+      add('vendor/xlsx.full.min.js', ()=>add(cdn, ()=>rej(new Error('xlsx load failed'))));
     });
   }
   // shared: turn a raw cell matrix into normalised rows + render preview/confirm
