@@ -1051,7 +1051,7 @@
       saveSet(s);
       if(PStore.mode==='live'){
         try{ await PStore.setFulfilment(s.fulfil); await PStore.setStoreSettings(s); }
-        catch(e){ toast('Saved locally — live sync failed, retry'); return; }
+        catch(e){ toast('Saved locally — live sync failed: '+((e&&e.message)||e)); return; }
       }
       if(toastMsg) toast(toastMsg);
     };

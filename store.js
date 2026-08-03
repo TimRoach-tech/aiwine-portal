@@ -39,7 +39,11 @@
     get ordersEmail() { const w = wineries.find(x => x.id === wineryId); return (w && w.ordersEmail) || ''; },
     get fulfilment() { const w = wineries.find(x => x.id === wineryId); return (w && w.fulfilment) || 'any'; },
     async setFulfilment(profile) {
-      const { error } = await sb.rpc('set_fulfilment', { p_winery: wineryId, p_profile: profile });
+      let { error } = await sb.rpc('set_fulfilment', { p_winery: wineryId, p_profile: profile });
+      if (error && /(function|does not exist|PGRST202|schema cache)/i.test(error.message)) {
+        // RPC not deployed — write the column directly (RLS scopes the row).
+        ({ error } = await sb.from('wineries').update({ fulfilment: profile }).eq('id', wineryId));
+      }
       if (error) throw new Error(error.message);
       const w = wineries.find(x => x.id === wineryId); if (w) w.fulfilment = profile;
     },
@@ -57,7 +61,16 @@
       };
     },
     async setStoreSettings(s) {
-      const { error } = await sb.rpc('set_store_settings', { p_winery: wineryId, p_settings: s });
+      let { error } = await sb.rpc('set_store_settings', { p_winery: wineryId, p_settings: s });
+      if (error && /(function|does not exist|PGRST202|schema cache)/i.test(error.message)) {
+        // RPC not deployed — write the columns directly (RLS scopes the row).
+        ({ error } = await sb.from('wineries').update({
+          free_threshold: s.freeThreshold, min_order: s.minOrder, mixed_cases: s.mixed,
+          paused: s.paused, paused_until: s.pausedUntil || null, dozen_on: s.dozenOn,
+          dozen_rate: s.dozenRate, alloc_on: s.allocOn, alloc_cap: s.allocCap,
+          alloc_wines: s.allocWines, local_pickup: s.pickup, gift_message: s.giftMsg, gift_wrap: s.giftWrap,
+        }).eq('id', wineryId));
+      }
       if (error) throw new Error(error.message);
       const w = wineries.find(x => x.id === wineryId);
       if (w) Object.assign(w, {
