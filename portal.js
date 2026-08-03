@@ -212,6 +212,7 @@
     document.querySelectorAll('.screen').forEach(s=>s.classList.remove('on'));
     const el = $('#screen-'+id); if(!el){ console.warn('no screen for',id); return; } el.classList.add('on');
     if(RENDER[id]) RENDER[id](el);
+    linkFields(el);
     el.querySelectorAll('table.tbl thead th').forEach(th=>{ if(th.textContent.trim()) th.setAttribute('scope','col'); });
     $('#side').classList.remove('open');
     if(!$('#modal').classList.contains('open')) $('#scrim').classList.remove('open');
@@ -1156,7 +1157,20 @@
       PStore.addWine(w); closeModal(); go('wines'); toast('Added · '+name+' is live on AIWine 🍷');
     };
   }
-  function openModal(){ _modalLastFocus=document.activeElement; $('#scrim').classList.add('open'); const m=$('#modal'); m.classList.add('open'); m.setAttribute('role','dialog'); m.setAttribute('aria-modal','true'); document.addEventListener('keydown',_modalKeydown); setTimeout(()=>{ const f=_modalFocusables(); (f[0]||m).focus(); },40); }
+  // Associate every .field's <label> with its control (input/select/textarea) via
+  // for/id, and give any placeholder-only control an aria-label from its label or
+  // placeholder — so nothing relies on a placeholder that vanishes on focus.
+  let _lfSeq=0;
+  function linkFields(root){
+    (root||document).querySelectorAll('.field').forEach(f=>{
+      const label=f.querySelector('label'); const ctrl=f.querySelector('input,select,textarea');
+      if(!ctrl) return;
+      if(!ctrl.id) ctrl.id='fld-'+(++_lfSeq);
+      if(label){ if(!label.htmlFor) label.htmlFor=ctrl.id; if(!ctrl.getAttribute('aria-label')) ctrl.setAttribute('aria-label', label.textContent.trim()); }
+      else if(!ctrl.getAttribute('aria-label') && ctrl.placeholder) ctrl.setAttribute('aria-label', ctrl.placeholder);
+    });
+  }
+  function openModal(){ _modalLastFocus=document.activeElement; $('#scrim').classList.add('open'); const m=$('#modal'); m.classList.add('open'); m.setAttribute('role','dialog'); m.setAttribute('aria-modal','true'); linkFields(m); document.addEventListener('keydown',_modalKeydown); setTimeout(()=>{ const f=_modalFocusables(); (f[0]||m).focus(); },40); }
   function closeModal(){ $('#scrim').classList.remove('open'); const m=$('#modal'); m.classList.remove('open'); document.removeEventListener('keydown',_modalKeydown); if(_modalLastFocus&&document.contains(_modalLastFocus)){ try{ _modalLastFocus.focus(); }catch(e){} } _modalLastFocus=null; }
   let _modalLastFocus=null;
   function _modalFocusables(){ const m=$('#modal'); if(!m) return []; if(!m.hasAttribute('tabindex')) m.setAttribute('tabindex','-1'); return Array.from(m.querySelectorAll('a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])')).filter(el=>el.offsetParent!==null); }
@@ -1198,6 +1212,8 @@
         ${inner}
         <div id="toast"></div>
       </div>`;
+  // After any auth screen renders, associate its field labels too.
+  { const _app=document.getElementById('app'); if(_app){ new MutationObserver(()=>linkFields(_app)).observe(_app,{childList:true}); } }
   const authHead = title => `
           <div class="wordmark" style="color:var(--ink);font-size:20px;margin-bottom:4px">AI<span class="dot" style="background:var(--claret)"></span>Wine<span class="sfx" style="color:var(--brass)">Partner</span></div>
           <div style="font-family:var(--serif);font-size:26px;font-weight:600;margin:10px 0 18px">${title}</div>`;
