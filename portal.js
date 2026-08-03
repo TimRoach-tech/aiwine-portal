@@ -354,7 +354,7 @@
     el.innerHTML = `
       <div class="page-head">
         <div><div class="eyebrow">Your range</div><h1 class="page-title">My <em>wines</em>.</h1>
-        <div class="sub-line">Change a price or stock level and it updates across AIWine in seconds.</div></div>
+        <div class="sub-line">Change a price or stock level and it updates across AIWine in seconds. To edit other wine details, select the wine, edit and save.</div></div>
         <div style="display:flex;gap:10px"><button class="btn" data-go="upload">${ic('upload',15)} Bulk upload</button><button class="btn primary" id="add2">${ic('plus',15)} Add bottle</button></div>
       </div>
       <div class="card">
@@ -1255,8 +1255,8 @@
       const pairs=($('#f-pair').value||'').split(';').map(s=>s.trim()).filter(Boolean).slice(0,3);
       const notes=($('#f-notes').value||'').trim().split(/\s+/).filter(Boolean).slice(0,25).join(' ');
       const fields={ name, variety:$('#f-var').value, colour:$('#f-colour').value, style:$('#f-style').value, organic:$('#f-organic').value==='Y', region:$('#f-region').value, subRegion:$('#f-sub').value.trim(), notes, pairings:pairs, awards:($('#f-awards').value||'').trim(), vintage:+$('#f-vin').value||2024, price:+$('#f-price').value||0, qty:+$('#f-qty').value||0 };
-      if(isEdit){ PStore.updateWine(edit.id, fields); WINES=PStore.wines; closeModal(); go('wines'); toast('Saved · '+name+' updated'); }
-      else { PStore.addWine(Object.assign({ id:Date.now(), scans:0 }, fields)); WINES=PStore.wines; closeModal(); go('wines'); toast('Added · '+name+' is live on AIWine 🍷'); }
+      if(isEdit){ const btn=$('#m-save'); btn.disabled=true; Promise.resolve(PStore.updateWine(edit.id, fields)).then(()=>{ WINES=PStore.wines; closeModal(); go('wines'); toast('Saved · '+name+' updated across AIWine'); }).catch(e=>{ btn.disabled=false; toast('Couldn’t save: '+(e&&e.message||e)); }); }
+      else { Promise.resolve(PStore.addWine(Object.assign({ id:Date.now(), scans:0 }, fields))).then(()=>{ WINES=PStore.wines; closeModal(); go('wines'); toast('Added · '+name+' is live on AIWine 🍷'); }).catch(e=>{ toast('Couldn’t add: '+(e&&e.message||e)); }); }
     };
   }
   // Associate every .field's <label> with its control (input/select/textarea) via

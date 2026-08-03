@@ -193,12 +193,19 @@
     async updateWine(id, patch) {
       const w = Store.wines.find(x => x.id === id); if (w) Object.assign(w, patch);
       if (LIVE) {
-        const db = Object.assign({}, patch);
-        if (db.qty !== undefined) { db.stock = db.qty; delete db.qty; } // table column is `stock`
-        db.updated_by = Store.userEmail || null;                        // who + when (provenance)
+        // Only send real wines columns, with the right types — a stray key or a
+        // string where the DB wants an array silently fails the whole PATCH.
+        const src = Object.assign({}, patch);
+        if (src.qty !== undefined) { src.stock = src.qty; delete src.qty; } // column is `stock`
+        const toArr = v => Array.isArray(v) ? v : (typeof v === 'string' ? v.split(';').map(s => s.trim()).filter(Boolean) : (v ? [v] : null));
+        const ALLOWED = ['name','variety','colour','style','vintage','price','stock','organic','notes','why','region','subRegion','pairings','awards','image_url','published'];
+        const db = {};
+        for (const k of ALLOWED) if (src[k] !== undefined) db[k] = k === 'awards' || k === 'pairings' ? toArr(src[k]) : src[k];
+        db.updated_by = Store.userEmail || null;
         db.updated_at = new Date().toISOString();
         if (w) { w.updatedBy = db.updated_by; w.updatedAt = db.updated_at; }
-        await sb.from('wines').update(db).eq('id', id);
+        const { error } = await sb.from('wines').update(db).eq('id', id);
+        if (error) throw new Error(error.message);
       }
     },
     async addWine(w) {
