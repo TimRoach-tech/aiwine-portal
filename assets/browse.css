@@ -1,0 +1,204 @@
+/* AIWine — browse components (regions + catalogue).
+   Extracted from index.html so the dedicated Regions and Wines pages share the
+   exact same card/grid styling. Loaded alongside styles.css on those pages. */
+
+/* Section frame */
+.section { padding: var(--pad-y) var(--pad-x); border-top: 1px solid var(--line); }
+.section-head { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 48px; gap: 32px; flex-wrap: wrap; }
+.section-title { font-family: 'Cormorant Garamond', serif; font-size: var(--t-h1); font-weight: 400; line-height: 1.05; max-width: 640px; letter-spacing: -0.01em; }
+.section-title em { font-style: italic; color: var(--claret); }
+.section-sub { max-width: 380px; color: var(--ink-soft); font-size: 15px; }
+.section-cta { margin-top: 44px; display: flex; justify-content: center; }
+
+/* Compact page hero for browse pages */
+.browse-hero { padding: clamp(56px, 8vw, 104px) var(--pad-x) clamp(28px, 4vw, 48px); position: relative; }
+.browse-hero-ring { position: absolute; top: 0; right: clamp(16px, 4vw, 60px); width: clamp(150px, 20vw, 300px); height: auto; opacity: 0.7; pointer-events: none; z-index: 0; }
+.browse-hero > *:not(.browse-hero-ring) { position: relative; z-index: 1; }
+@media (max-width: 760px) { .browse-hero-ring { display: none; } }
+.browse-hero .eyebrow { font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--brass); display: inline-flex; align-items: center; gap: 9px; }
+.browse-hero .eyebrow::before { content: ''; width: 24px; height: 1px; background: var(--brass); }
+.browse-hero h1 { font-family: 'Cormorant Garamond', serif; font-weight: 400; font-size: clamp(38px, 6vw, 68px); line-height: 1.03; letter-spacing: -0.015em; margin: 16px 0 0; max-width: 16ch; }
+.browse-hero h1 em { font-style: italic; color: var(--claret); }
+.browse-hero p { font-size: clamp(15px, 2.2vw, 18px); line-height: 1.6; color: var(--ink-soft); max-width: 58ch; margin: 18px 0 0; }
+
+/* REGIONS */
+.regions-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; background: var(--line); border: 1px solid var(--line); }
+@media (max-width: 900px) { .regions-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 560px) { .regions-grid { grid-template-columns: 1fr; } }
+.region-card { background: var(--card); padding: 36px 32px 32px; display: flex; flex-direction: column; gap: 16px; min-height: 280px; transition: background 0.2s; position: relative; cursor: pointer; }
+.region-card.soon { cursor: default; }
+.region-card.live:hover, .region-card.directory:hover { background: var(--bg-alt); }
+.region-tag { display: inline-flex; align-items: center; gap: 6px; align-self: flex-start; padding: 4px 10px; border-radius: 999px; font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; }
+.region-tag.live { background: var(--claret); color: var(--bg); }
+.region-tag.live::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--brass-soft); animation: pulse 2s infinite; }
+.region-tag.soon { background: var(--bg-alt); color: var(--muted); border: 1px solid var(--line); }
+.region-tag.directory { background: var(--bg-alt); color: var(--brass); border: 1px solid var(--brass-soft); }
+.region-tag.directory::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--brass); }
+.region-name { font-family: 'Cormorant Garamond', serif; font-size: 36px; line-height: 1.05; font-weight: 400; }
+.region-tag-line { color: var(--ink-soft); font-size: 14px; flex: 1; }
+.region-cta { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; letter-spacing: 0.04em; margin-top: auto; }
+.region-cta.live, .region-cta.directory { color: var(--claret); }
+.region-cta.soon { color: var(--muted); }
+.region-accent { position: absolute; bottom: 0; left: 0; right: 0; height: 3px; background: var(--region-accent, var(--line)); transform: scaleX(0); transform-origin: left; transition: transform 0.4s; }
+.region-card.live:hover .region-accent, .region-card.directory:hover .region-accent { transform: scaleX(1); }
+.region-card.wide { grid-column: 1 / -1; flex-direction: row; align-items: center; justify-content: space-between; min-height: 0; padding: 28px 32px; gap: 28px; }
+.region-card.wide .rc-wide-main { display: flex; flex-direction: column; gap: 8px; }
+.region-card.wide .region-name { font-size: 30px; }
+.region-card.wide .region-tag-line { flex: none; max-width: 520px; }
+.region-card.wide .region-cta { margin-top: 0; white-space: nowrap; }
+@media (max-width: 560px) { .region-card.wide { flex-direction: column; align-items: flex-start; gap: 14px; } }
+
+/* CATALOGUE / WINES */
+.featured-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 24px; }
+@media (max-width: 1100px) { .featured-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 560px) { .featured-grid { grid-template-columns: 1fr; } }
+.wine-card { display: flex; flex-direction: column; background: var(--card); border: 1px solid var(--line); transition: box-shadow 0.3s; }
+.wine-card:hover { box-shadow: 0 20px 40px rgba(0,0,0,0.08); }
+
+/* tinted shelf that stands a bottle */
+.wine-shot { aspect-ratio: 4/5; position: relative; overflow: hidden; padding: 22px;
+  display: flex; flex-direction: column; justify-content: space-between;
+  background: radial-gradient(120% 80% at 50% 8%, #FBF7EF 0%, #F1E9D8 55%, #E6DAC2 100%); }
+.wine-shot::before { content: ''; position: absolute; inset: 12px; border: 1px solid rgba(92,27,39,0.14); pointer-events: none; z-index: 3; }
+/* ground glow removed — the bottle's own drop-shadow is the only shadow now */
+.wine-shot::after { content: none; }
+.wine-shot-meta { position: relative; z-index: 2; font-family: 'JetBrains Mono', monospace; font-size: 9px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--ink-soft); opacity: 0.9; }
+.wine-shot-foot { position: relative; z-index: 2; display: flex; justify-content: space-between; align-items: flex-end; font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-soft); opacity: 0.9; }
+.wine-bottle { position: absolute; left: 50%; bottom: 9%; transform: translateX(-50%); height: 82%; width: auto; max-width: 74%; object-fit: contain; object-position: center bottom; z-index: 2;
+  transform-origin: 50% 100%; filter: drop-shadow(0 8px 12px rgba(0,0,0,0.22));
+  transition: transform 0.35s ease; }
+.wine-shot:hover .wine-bottle, .wine-shot:active .wine-bottle { transform: translateX(-50%) scale(1.12); z-index: 6; }
+/* wobble briefly, then rest — and stagger duration + delay so no two swirl together */
+@keyframes tasteWobble {
+  0%      { transform: translateX(-50%) rotate(0deg); }
+  3%      { transform: translateX(-50.5%) rotate(-0.9deg); }
+  6.5%    { transform: translateX(-49.6%) rotate(0.7deg); }
+  9.5%    { transform: translateX(-50.2%) rotate(-0.3deg); }
+  12.5%   { transform: translateX(-50%) rotate(0deg); }
+  100%    { transform: translateX(-50%) rotate(0deg); }
+}
+.wine-card:nth-child(8n+1) .wine-bottle { --wob-dur: 13s; --wob-delay: 0s; }
+.wine-card:nth-child(8n+2) .wine-bottle { --wob-dur: 17s; --wob-delay: 3.4s; }
+.wine-card:nth-child(8n+3) .wine-bottle { --wob-dur: 15s; --wob-delay: 6.1s; }
+.wine-card:nth-child(8n+4) .wine-bottle { --wob-dur: 19s; --wob-delay: 1.7s; }
+.wine-card:nth-child(8n+5) .wine-bottle { --wob-dur: 14s; --wob-delay: 8.3s; }
+.wine-card:nth-child(8n+6) .wine-bottle { --wob-dur: 18s; --wob-delay: 4.6s; }
+.wine-card:nth-child(8n+7) .wine-bottle { --wob-dur: 16s; --wob-delay: 10.2s; }
+.wine-card:nth-child(8n+8) .wine-bottle { --wob-dur: 20s; --wob-delay: 2.5s; }
+@keyframes tasteWobbleHover {
+  0%,100% { transform: translateX(-50%) rotate(0deg); }
+  25%     { transform: translateX(-50.8%) rotate(-1.3deg); }
+  75%     { transform: translateX(-49.2%) rotate(1.3deg); }
+}
+@media (prefers-reduced-motion: reduce) { .wine-bottle, .wine-card:hover .wine-bottle { animation: none; } }
+
+/* ===== 1A card furniture: bone plinth, brass rating seal, region chip ===== */
+.wine-card { cursor: pointer; }
+.wine-region { position: absolute; top: 18px; left: 18px; z-index: 4; display: inline-flex; align-items: center; gap: 6px;
+  font-family: 'JetBrains Mono', monospace; font-size: 9px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--claret);
+  background: rgba(255,255,255,0.78); border: 1px solid rgba(92,27,39,0.18); border-radius: 999px; padding: 5px 10px; }
+.wine-region::before { content: ''; width: 5px; height: 5px; border-radius: 50%; background: var(--brass); }
+.wine-seal { position: absolute; top: 16px; right: 16px; z-index: 4; width: 46px; height: 46px; border-radius: 50%;
+  background: radial-gradient(circle at 38% 32%, #C9A878, #8a6a3c); color: #fff; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  box-shadow: 0 5px 12px rgba(90,60,20,0.38); border: 1.5px solid rgba(255,255,255,0.55); }
+.wine-seal .n { font-family: 'Cormorant Garamond', serif; font-weight: 600; font-size: 19px; line-height: 1; }
+.wine-seal .l { font-family: 'JetBrains Mono', monospace; font-size: 6.5px; letter-spacing: 0.12em; text-transform: uppercase; opacity: 0.9; margin-top: 1px; }
+.wine-pins { position: absolute; left: 18px; bottom: 16px; z-index: 4; display: flex; gap: 6px; }
+.wine-pin { font-family: 'JetBrains Mono', monospace; font-size: 8.5px; letter-spacing: 0.1em; text-transform: uppercase; color: #5c4a20;
+  background: rgba(255,255,255,0.82); border: 1px solid rgba(169,134,84,0.5); border-radius: 4px; padding: 3px 7px; }
+/* generated label for wineries without a photo yet (sample bottle) */
+.wine-samplelabel { position: absolute; left: 50%; top: 42%; transform: translateX(-50%); z-index: 5; width: 38%; min-width: 92px; text-align: center;
+  background: linear-gradient(180deg,#f6efe0,#ece0c9); border: 1px solid #d8c9a8; border-radius: 2px; padding: 11px 9px 9px; box-shadow: 0 3px 8px rgba(0,0,0,0.28); }
+.wine-samplelabel .sl-w { font-family: 'JetBrains Mono', monospace; font-size: 6.5px; letter-spacing: 0.14em; text-transform: uppercase; color: #8a6a3c; }
+.wine-samplelabel .sl-n { font-family: 'Cormorant Garamond', serif; font-style: italic; font-size: 15px; line-height: 1.02; color: #3a2a18; margin: 3px 0; }
+.wine-samplelabel .sl-d { font-family: 'JetBrains Mono', monospace; font-size: 6px; letter-spacing: 0.1em; text-transform: uppercase; color: #8a6a3c; border-top: 1px solid #d0bd98; padding-top: 3px; margin-top: 3px; }
+.wine-samplehint { position: absolute; right: 14px; bottom: 12px; z-index: 4; font-family: 'JetBrains Mono', monospace; font-size: 8px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); }
+.wine-meta { font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--brass); }
+
+/* ===== Option 2: quick-look overlay ===== */
+.ql-overlay { position: fixed; inset: 0; z-index: 200; background: rgba(27,20,16,0.55); backdrop-filter: blur(3px); display: none; align-items: center; justify-content: center; padding: 24px; }
+.ql-overlay.open { display: flex; }
+.ql-modal { width: min(760px, 100%); max-height: 92vh; overflow: auto; background: var(--card); border: 1px solid var(--line); border-radius: 6px; display: grid; grid-template-columns: 300px 1fr; box-shadow: 0 40px 90px rgba(0,0,0,0.4); }
+@media (max-width: 640px) { .ql-modal { grid-template-columns: 1fr; } }
+.ql-shot { position: relative; overflow: hidden; background: radial-gradient(120% 80% at 50% 8%, #FBF7EF, #E6DAC2); min-height: 300px; }
+.ql-shot::before { content: ''; position: absolute; inset: 12px; border: 1px solid rgba(92,27,39,0.14); z-index: 3; }
+.ql-shot::after { content: none; }
+.ql-shot img { position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); height: 92%; width: auto; filter: drop-shadow(0 8px 12px rgba(0,0,0,0.2)); z-index: 2; }
+.ql-body { padding: 30px 32px; position: relative; }
+.ql-close { position: absolute; top: 16px; right: 16px; width: 34px; height: 34px; border-radius: 50%; border: 1px solid var(--line); color: var(--ink-soft); display: flex; align-items: center; justify-content: center; background: var(--card); }
+.ql-close:hover { background: var(--bg-alt); }
+.ql-why { margin-top: 16px; padding: 12px 14px; background: color-mix(in oklab, var(--claret), var(--card) 92%); border-left: 2px solid var(--claret); border-radius: 0 5px 5px 0; }
+.ql-why .k { font-family: 'JetBrains Mono', monospace; font-size: 8.5px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--claret); margin-bottom: 4px; }
+.ql-why p { font-family: 'Cormorant Garamond', serif; font-style: italic; font-size: 16px; line-height: 1.5; color: var(--ink-soft); }
+.ql-pairings { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 14px; }
+.ql-pair { font-size: 11px; color: var(--ink-soft); background: var(--bg-alt); border: 1px solid var(--line); border-radius: 999px; padding: 4px 10px; }
+.wine-body-head { display: flex; flex-direction: column; gap: 3px; }
+.wine-body-winery { font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--muted); }
+.wine-body-name { font-family: 'Cormorant Garamond', serif; font-size: 24px; line-height: 1.05; font-style: italic; font-weight: 400; color: var(--ink); }
+
+.wine-label { aspect-ratio: 4/5; position: relative; background: linear-gradient(180deg, var(--tint, var(--claret)) 0%, color-mix(in oklab, var(--tint, var(--claret)), black 28%) 100%); padding: 26px; color: rgba(255,255,255,0.95); display: flex; flex-direction: column; justify-content: space-between; overflow: hidden; }
+.wine-label::before { content: ''; position: absolute; inset: 12px; border: 1px solid rgba(255,255,255,0.18); pointer-events: none; }
+.wine-label-meta { font-family: 'JetBrains Mono', monospace; font-size: 9px; letter-spacing: 0.16em; text-transform: uppercase; opacity: 0.85; }
+.wine-label-name { font-family: 'Cormorant Garamond', serif; font-size: 26px; line-height: 1.05; font-style: italic; font-weight: 400; }
+.wine-label-winery { font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.16em; text-transform: uppercase; margin-bottom: 6px; }
+.wine-label-foot { display: flex; justify-content: space-between; align-items: flex-end; font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; opacity: 0.85; }
+.wine-body { padding: 20px 22px 22px; display: flex; flex-direction: column; gap: 12px; flex: 1; }
+.wine-notes { font-size: 14px; color: var(--ink-soft); line-height: 1.5; min-height: 4.5em; }
+.wine-foot { display: flex; justify-content: space-between; align-items: center; padding-top: 8px; margin-top: auto; border-top: 1px solid var(--line); }
+.wine-price { font-family: 'JetBrains Mono', monospace; font-size: 16px; font-weight: 500; }
+.wine-add { padding: 9px 16px; border: 1px solid var(--ink); border-radius: 999px; font-size: 11px; font-weight: 600; letter-spacing: 0.04em; transition: all 0.2s; }
+.wine-add:hover { background: var(--ink); color: var(--bg); }
+.wine-add.added { background: var(--claret); border-color: var(--claret); color: var(--bg); }
+.wine-add.sold-out, .wine-add:disabled { opacity: 0.5; cursor: default; }
+.filters-bar { display: flex; gap: 24px; align-items: flex-end; justify-content: space-between; flex-wrap: wrap; margin-bottom: 24px; }
+.filters { display: flex; gap: 8px; flex-wrap: wrap; }
+.filter-chip { padding: 9px 16px; border: 1px solid var(--line); border-radius: 999px; font-size: 13px; font-weight: 500; background: var(--card); color: var(--ink-soft); transition: all .2s; cursor: pointer; }
+.filter-chip:hover { border-color: var(--ink); color: var(--ink); }
+.filter-chip.active { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.filter-count { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--muted); letter-spacing: 0.1em; white-space: nowrap; }
+/* region + sort controls */
+.cat-controls { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; width: 100%; justify-content: flex-start; }
+.cat-sel { display: inline-flex; align-items: center; gap: 8px; font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); }
+.cat-sel select { font-family: 'Manrope', sans-serif; font-size: 13px; font-weight: 500; letter-spacing: 0; text-transform: none; color: var(--ink); background: var(--card); border: 1px solid var(--line); border-radius: 999px; padding: 9px 34px 9px 14px; cursor: pointer; transition: border-color .2s; appearance: none; -webkit-appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%239a8d80' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 13px center; }
+.cat-sel select:hover { border-color: var(--ink); }
+/* keyword search + toggles (compose with existing .cat-sel) */
+.cat-search { display: inline-flex; align-items: center; gap: 8px; background: var(--card); border: 1px solid var(--line); border-radius: 999px; padding: 7px 14px; transition: border-color .2s; }
+.cat-search:focus-within { border-color: var(--ink); }
+.cat-search svg { flex: none; color: var(--muted); }
+.cat-search input { border: none; background: none; outline: none; font-family: 'Manrope', sans-serif; font-size: 13px; color: var(--ink); width: 168px; }
+.cat-search input::placeholder { color: var(--muted); }
+.cat-toggle { display: inline-flex; align-items: center; gap: 7px; font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); cursor: pointer; user-select: none; white-space: nowrap; }
+.cat-toggle input { position: absolute; opacity: 0; pointer-events: none; }
+.cat-toggle .tg { width: 34px; height: 19px; border-radius: 999px; background: var(--line); position: relative; transition: background .2s; flex: none; }
+.cat-toggle .tg::after { content: ''; position: absolute; top: 2px; left: 2px; width: 15px; height: 15px; border-radius: 50%; background: #fff; transition: transform .2s; box-shadow: 0 1px 2px rgba(0,0,0,.25); }
+.cat-toggle input:checked + .tg { background: var(--claret); }
+.cat-toggle input:checked + .tg::after { transform: translateX(15px); }
+.cat-toggle input:focus-visible + .tg { outline: 2px solid var(--claret); outline-offset: 2px; }
+.cat-reset { font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--claret); background: none; border: none; cursor: pointer; padding: 4px 2px; }
+.cat-reset:hover { text-decoration: underline; }
+.browse-somm { margin-top: 14px; font-size: 14px; color: var(--ink-soft); }
+.browse-somm button { font: inherit; color: var(--claret); font-weight: 600; background: none; border: none; cursor: pointer; padding: 0; text-decoration: underline; text-underline-offset: 3px; }
+.wine-organic { position: absolute; top: 14px; right: 14px; width: 24px; height: 24px; border-radius: 50%; background: rgba(255,255,255,0.92); color: var(--ink); font-family: 'JetBrains Mono', monospace; font-size: 9px; font-weight: 700; display: flex; align-items: center; justify-content: center; z-index: 4; }
+.wine-shot .wine-organic { top: 38px; }
+
+/* region + winery grids: smaller cards — shrink bottle & nudge bottle+label down so they don't crowd the header */
+body.compact-cards .wine-bottle { height: 74%; max-width: 66%; bottom: 8%; }
+body.compact-cards .wine-samplelabel { top: 48%; }
+.wine-samplelabel { z-index: 7; }
+
+/* ===== Loading skeleton (catalogue never a blank dead-end while data loads) ===== */
+.wine-skeleton { cursor: default; pointer-events: none; overflow: hidden; }
+.wine-skeleton .ws-shot { aspect-ratio: 3/4; background: var(--bg-alt, #F1E9DA); position: relative; }
+.wine-skeleton .ws-line { height: 13px; margin: 14px 18px 0; border-radius: 3px; background: var(--bg-alt, #F1E9DA); }
+.wine-skeleton .ws-line.short { width: 52%; margin-bottom: 18px; }
+.wine-skeleton .ws-shot::after, .wine-skeleton .ws-line::after {
+  content: ''; position: absolute; inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,.55), transparent);
+  transform: translateX(-100%); animation: ws-shimmer 1.25s infinite;
+}
+.wine-skeleton .ws-line { position: relative; overflow: hidden; }
+@keyframes ws-shimmer { 100% { transform: translateX(100%); } }
+@media (prefers-reduced-motion: reduce) { .wine-skeleton .ws-shot::after, .wine-skeleton .ws-line::after { animation: none; } }
+
+.wine-name-link{color:inherit;text-decoration:none}
+.wine-name-link:hover{color:var(--claret);text-decoration:underline;text-underline-offset:2px}
