@@ -40,8 +40,9 @@
     get fulfilment() { const w = wineries.find(x => x.id === wineryId); return (w && w.fulfilment) || 'any'; },
     async setFulfilment(profile) {
       let { error } = await sb.rpc('set_fulfilment', { p_winery: wineryId, p_profile: profile });
-      if (error && /(function|does not exist|PGRST202|schema cache)/i.test(error.message)) {
-        // RPC not deployed — write the column directly (RLS scopes the row).
+      if (error && /(function|does not exist|PGRST202|schema cache|not_authoris|not_authoriz)/i.test(error.message)) {
+        // RPC not deployed or its auth check rejects — write the column directly
+        // (governed by the wineries RLS row policy).
         ({ error } = await sb.from('wineries').update({ fulfilment: profile }).eq('id', wineryId));
       }
       if (error) throw new Error(error.message);
@@ -61,15 +62,17 @@
       };
     },
     async setStoreSettings(s) {
-      let { error } = await sb.rpc('set_store_settings', { p_winery: wineryId, p_settings: s });
-      if (error && /(function|does not exist|PGRST202|schema cache)/i.test(error.message)) {
-        // RPC not deployed — write the columns directly (RLS scopes the row).
-        ({ error } = await sb.from('wineries').update({
+      let { data, error } = await sb.rpc('set_store_settings', { p_winery: wineryId, p_settings: s });
+      if (error && /(function|does not exist|PGRST202|schema cache|not_authoris|not_authoriz)/i.test(error.message)) {
+        // RPC not deployed, or its winery_users auth check rejects this user —
+        // write the columns directly (governed by the wineries RLS row policy).
+        ({ data, error } = await sb.from('wineries').update({
           free_threshold: s.freeThreshold, min_order: s.minOrder, mixed_cases: s.mixed,
           paused: s.paused, paused_until: s.pausedUntil || null, dozen_on: s.dozenOn,
           dozen_rate: s.dozenRate, alloc_on: s.allocOn, alloc_cap: s.allocCap,
           alloc_wines: s.allocWines, local_pickup: s.pickup, gift_message: s.giftMsg, gift_wrap: s.giftWrap,
-        }).eq('id', wineryId));
+        }).eq('id', wineryId).select('id'));
+        if (!error && (!data || !data.length)) throw new Error('You are not linked to this winery in the database (no winery_users row for your login) — settings can\u2019t be saved. Ask an admin to link your account.');
       }
       if (error) throw new Error(error.message);
       const w = wineries.find(x => x.id === wineryId);
