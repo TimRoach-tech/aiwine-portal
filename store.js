@@ -224,6 +224,25 @@
       Store.wines = Store.wines.filter(x => x.id !== id);
       if (LIVE) await sb.from('wines').delete().eq('id', id);
     },
+    // Upload a bottle photo to Supabase Storage and save its public URL on the
+    // wine row. Returns the public URL. LIVE only (demo keeps localStorage).
+    async uploadWineImage(id, file) {
+      if (!LIVE) throw new Error('demo');
+      const ext = (file.type && file.type.split('/')[1] || 'jpg').replace('jpeg', 'jpg');
+      const path = `${wineryId}/${id}.${ext}`;
+      const up = await sb.storage.from('wine-images').upload(path, file, { upsert: true, contentType: file.type || 'image/jpeg' });
+      if (up.error) throw new Error(up.error.message);
+      const { data } = sb.storage.from('wine-images').getPublicUrl(path);
+      const url = data.publicUrl + '?t=' + Date.now();   // cache-bust on replace
+      await Store.updateWine(id, { image_url: url });
+      const w = Store.wines.find(x => x.id === id); if (w) w.image = url;
+      return url;
+    },
+    async removeWineImage(id) {
+      const w = Store.wines.find(x => x.id === id);
+      if (LIVE) { try { await sb.storage.from('wine-images').remove([`${wineryId}/${id}.jpg`, `${wineryId}/${id}.png`, `${wineryId}/${id}.webp`]); } catch (e) {} await Store.updateWine(id, { image_url: null }); }
+      if (w) w.image = '';
+    },
     async updateOrder(id, patch) {
       const o = Store.orders.find(x => x.id === id); if (o) Object.assign(o, patch);
       if (LIVE) await sb.from('orders').update(patch).eq('id', id);
@@ -266,7 +285,7 @@
     },
   };
 
-  function normWine(r) { return { id: r.id, name: r.name, variety: r.variety, colour: r.colour, vintage: r.vintage, price: +r.price || 0, qty: +r.stock || +r.qty || 0, scans: +r.scans || 0, notes: r.notes || '', why: r.why || '', createdBy: r.created_by || '', createdAt: r.created_at || '', updatedBy: r.updated_by || '', updatedAt: r.updated_at || '' }; }
+  function normWine(r) { return { id: r.id, name: r.name, variety: r.variety, colour: r.colour, vintage: r.vintage, price: +r.price || 0, qty: +r.stock || +r.qty || 0, scans: +r.scans || 0, notes: r.notes || '', why: r.why || '', image: r.image_url || '', createdBy: r.created_by || '', createdAt: r.created_at || '', updatedBy: r.updated_by || '', updatedAt: r.updated_at || '' }; }
   function normOrder(r) {
     const items = (r.order_items || []).map(i => `${i.qty} × ${i.name}`).join(' · ');
     return { id: r.id, placedAt: rel(r.placedAt), destination: r.destination, items, total: +r.total || 0, status: r.status, gifts: r.gifts || null, method: r.method || 'deliver' };

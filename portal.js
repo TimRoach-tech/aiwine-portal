@@ -111,6 +111,11 @@
     $('#cm-yes').onclick=()=>{ done(); try{ onYes(); }catch(e){} };
   }
   const bottleEl = w => `<span class="bottle" style="background:linear-gradient(160deg,${TINT[w.variety]||'#5C1B27'},#1B1410)"></span>`;
+  // Shared bottle-photo accessor (same store the Wine images screen writes to).
+  const WINE_IMG_KEY='aiwine-portal:wine-images';
+  function wineImg(id){ try{ return (JSON.parse(localStorage.getItem(WINE_IMG_KEY))||{})[id]||''; }catch(e){ return ''; } }
+  // Thumbnail for lists: the winery's uploaded photo if present, else the tint bottle.
+  function wineThumb(w){ const src=w.image||wineImg(w.id); return src?`<span class="bottle" style="overflow:hidden;background:var(--card-2)"><img src="${src}" alt="" style="width:100%;height:100%;object-fit:cover"></span>`:bottleEl(w); }
   const stockPill = s => `<span class="pill ${s}">${s==='in'?'In stock':s==='low'?'Low':'Out'}</span>`;
   const stkOf = w => w.qty<=0?'out':w.qty<=8?'low':'in';
   const APP_URL = (window.PORTAL_CONFIG && window.PORTAL_CONFIG.WINERY_APP_URL) || '../apps/winery/index.html';
@@ -381,7 +386,7 @@
   }
   function wineRow(w){
     return `<tr data-wid="${w.id}">
-      <td><div class="wine-cell">${bottleEl(w)}<div><div class="wine-nm">${esc(w.name)}</div><div class="wine-meta">${esc(w.variety)} · ${esc(w.vintage)}</div>${provLine(w)}</div></div></td>
+      <td><div class="wine-cell">${wineThumb(w)}<div><div class="wine-nm">${esc(w.name)}</div><div class="wine-meta">${esc(w.variety)} · ${esc(w.vintage)}</div>${provLine(w)}</div></div></td>
       <td><span class="price-edit"><span>$</span><input type="number" min="0" value="${w.price}" data-price aria-label="Price for ${esc(w.name)}, dollars incl GST"></span></td>
       <td><span class="stepper"><button data-dec aria-label="Decrease stock for ${esc(w.name)}">−</button><input type="number" min="0" value="${w.qty}" data-qty aria-label="Bottles in cellar for ${esc(w.name)}"><button data-inc aria-label="Increase stock for ${esc(w.name)}">+</button></span></td>
       <td data-stock>${stockPill(stkOf(w))}</td>
@@ -1106,6 +1111,7 @@
   // ---------- wine images (bottle photos) ----------
   RENDER.images = el => {
     const KEY='aiwine-portal:wine-images';
+    const LIVE = PStore.mode==='live';
     let imgs; try{ imgs=JSON.parse(localStorage.getItem(KEY))||{}; }catch(e){ imgs={}; }
     const save=()=>{ try{ localStorage.setItem(KEY,JSON.stringify(imgs)); return true; }catch(e){ return false; } };
     const slug=s=>String(s||'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
@@ -1124,11 +1130,22 @@
     };
     let target=null;
     const single=document.createElement('input'); single.type='file'; single.accept='image/*';
-    single.addEventListener('change',e=>{ const f=e.target.files[0]; if(f&&target){ const t=target; toDataURL(f,d=>{ imgs[t]=d; if(save()){ draw(); toast('Photo added'); } else { delete imgs[t]; draw(); toast('Couldn’t save — photo too large for local storage. Try a smaller image.'); } }); } single.value=''; target=null; });
+    // live: current photo is the wine's saved image_url; demo: localStorage map
+    const imgOf = w => LIVE ? (w.image||'') : (imgs[w.id]||'');
+    single.addEventListener('change',e=>{ const f=e.target.files[0]; if(!f||!target) { single.value=''; target=null; return; } const t=target; single.value=''; target=null;
+      if(LIVE){ toast('Uploading photo…'); PStore.uploadWineImage(t,f).then(()=>{ WINES=PStore.wines; draw(); toast('Photo uploaded — live on the site'); }).catch(err=>{ toast('Upload failed: '+(err&&err.message||err)); }); }
+      else { toDataURL(f,d=>{ imgs[t]=d; if(save()){ draw(); toast('Photo added'); } else { delete imgs[t]; draw(); toast('Couldn’t save — photo too large for local storage. Try a smaller image.'); } }); }
+    });
     function handleFiles(files){
-      const arr=[...files].filter(f=>/^image\//.test(f.type)); let pending=arr.length; if(!pending) return; let matched=0, un=0;
-      arr.forEach(f=>{ const base=slug(f.name.replace(/\.[^.]+$/,''));
-        const w=WINES.find(x=>{ const s1=slug(x.name+'-'+(x.vintage||'')); const s2=slug(x.name); return base===s1||base===s2||(s2&&base.indexOf(s2)>=0); });
+      const arr=[...files].filter(f=>/^image\//.test(f.type)); if(!arr.length) return;
+      const match=f=>{ const base=slug(f.name.replace(/\.[^.]+$/,'')); return WINES.find(x=>{ const s1=slug(x.name+'-'+(x.vintage||'')); const s2=slug(x.name); return base===s1||base===s2||(s2&&base.indexOf(s2)>=0); }); };
+      if(LIVE){ let matched=0, un=0; toast('Uploading…');
+        Promise.all(arr.map(f=>{ const w=match(f); if(!w){ un++; return Promise.resolve(); } return PStore.uploadWineImage(w.id,f).then(()=>{matched++;}).catch(()=>{un++;}); }))
+          .then(()=>{ WINES=PStore.wines; draw(); toast(matched+' uploaded'+(un?' · '+un+' unmatched':'')+' — live on the site'); });
+        return;
+      }
+      let pending=arr.length, matched=0, un=0;
+      arr.forEach(f=>{ const w=match(f);
         toDataURL(f,d=>{ if(w){ imgs[w.id]=d; matched++; } else un++; if(--pending===0){ const ok=save(); draw(); toast(ok?(matched+' matched'+(un?' · '+un+' unmatched':'')):'Couldn’t save — photos too large for local storage.'); } }); });
     }
     function draw(){
@@ -1139,14 +1156,14 @@
         <div class="drop" id="drop"><div class="dic">${ic('image',26)}</div><h3>Drop bottle photos here</h3><p>JPG or PNG. Name each file like the wine + vintage, e.g. <b>crimson-pinot-noir-2023.jpg</b> — it lands on the right wine automatically.</p><input type="file" id="fileall" accept="image/*" multiple hidden></div>
         <div class="card" style="margin-top:18px"><div class="tbl-wrap"><table class="tbl">
           <thead><tr><th>Photo</th><th>Wine</th><th>File name to use</th><th></th></tr></thead>
-          <tbody>${WINES.map(w=>{ const src=imgs[w.id]; const fn=slug(w.name+'-'+(w.vintage||''))+'.jpg';
+          <tbody>${WINES.map(w=>{ const src=imgOf(w); const fn=slug(w.name+'-'+(w.vintage||''))+'.jpg';
             return `<tr><td><div style="width:38px;height:48px;border-radius:6px;overflow:hidden;background:var(--card-2);display:flex;align-items:center;justify-content:center;color:var(--muted)">${src?`<img src="${src}" style="width:100%;height:100%;object-fit:cover" alt="">`:ic('image',16)}</div></td>
             <td><div class="wine-nm">${esc(w.name)}</div><div class="wine-meta">${w.variety} · ${w.vintage}</div></td>
             <td class="mono" style="font-size:12px;color:var(--muted)">${fn}</td>
             <td class="r" style="white-space:nowrap;vertical-align:middle"><div style="display:inline-flex;gap:6px;align-items:center;justify-content:flex-end"><button class="btn sm" data-up="${w.id}">${src?'Replace':'Upload'}</button>${src?`<button class="btn-quiet" data-rm="${w.id}" title="Remove" aria-label="Remove photo">${ic('x',15)}</button>`:''}</div></td></tr>`;
           }).join('')}</tbody></table></div></div>`;
       el.querySelectorAll('[data-up]').forEach(b=>b.addEventListener('click',()=>{ target=b.dataset.up; single.click(); }));
-      el.querySelectorAll('[data-rm]').forEach(b=>b.addEventListener('click',()=>{ delete imgs[b.dataset.rm]; save(); draw(); }));
+      el.querySelectorAll('[data-rm]').forEach(b=>b.addEventListener('click',()=>{ if(LIVE){ PStore.removeWineImage(b.dataset.rm).then(()=>{ WINES=PStore.wines; draw(); toast('Photo removed'); }); } else { delete imgs[b.dataset.rm]; save(); draw(); } }));
       const fa=el.querySelector('#fileall');
       el.querySelector('#pickall').addEventListener('click',()=>fa.click());
       fa.addEventListener('change',e=>handleFiles(e.target.files));
