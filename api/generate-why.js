@@ -7,9 +7,14 @@
 // Deploy as a Vercel serverless function in the portal project (same repo as
 // stripe-webhook.js). Trigger it:
 //   • manually:  GET https://portal.aiwine.co.nz/api/generate-why?key=GENERATE_WHY_SECRET
-//   • on a schedule: add a Vercel Cron hitting this path daily.
+//   • on a schedule: a Vercel Cron (vercel.json) hits this path every 15 min.
 //   • one wine:  ...&id=<wineId>   (regenerate a single wine)
 //   • overwrite: ...&force=1       (redo even wines that already have a why)
+//   • include demo rows: ...&demo=1 (default SKIPS demo/seed wines)
+//
+// Only REAL winery wines are processed by default: demo/seed catalogue rows have
+// no `created_by`, whereas every genuine upload stamps it — so we never spend AI
+// budget on throwaway demo data, and new winery uploads get a why automatically.
 //
 // ENV (Vercel project settings — NEVER in any config.js):
 //   SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY   (service role: server-only writes)
@@ -82,15 +87,22 @@ Return ONLY the sentence.`;
 module.exports = async (req, res) => {
   try {
     const q = req.query || {};
-    if (q.key !== process.env.GENERATE_WHY_SECRET) return res.status(401).json({ error: 'unauthorized' });
+    // Authorized if: manual call with the right &key, OR it's Vercel Cron
+    // (Vercel sets the x-vercel-cron header on scheduled invocations).
+    const isCron = !!(req.headers && req.headers['x-vercel-cron']);
+    if (!isCron && q.key !== process.env.GENERATE_WHY_SECRET) return res.status(401).json({ error: 'unauthorized' });
 
     const force = q.force === '1';
+    const includeDemo = q.demo === '1';
+    // Real wines only (default): created_by is set on genuine winery uploads,
+    // null on the demo/seed catalogue. `&demo=1` overrides to include everything.
+    const realOnly = includeDemo ? '' : '&created_by=not.is.null';
     let filter;
-    if (q.id) filter = `?id=eq.${encodeURIComponent(q.id)}`;
-    else if (force) filter = `?select=*&limit=${BATCH}`;
-    else filter = `?or=(why.is.null,why.eq.)&limit=${BATCH}`;   // only wines missing a why
+    if (q.id) filter = `?id=eq.${encodeURIComponent(q.id)}&select=*`;
+    else if (force) filter = `?select=*${realOnly}&limit=${BATCH}`;
+    else filter = `?select=*&or=(why.is.null,why.eq.)${realOnly}&limit=${BATCH}`;   // missing why, real wines
 
-    const wines = await sb('wines', { query: filter + (filter.includes('select') ? '' : '&select=*') });
+    const wines = await sb('wines', { query: filter });
     let done = 0, failed = 0;
     for (const w of wines) {
       if (!force && !q.id && w.why) continue;

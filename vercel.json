@@ -1,0 +1,5 @@
+{
+  "crons": [
+    { "path": "/api/generate-why", "schedule": "*/15 * * * *" }
+  ]
+}
