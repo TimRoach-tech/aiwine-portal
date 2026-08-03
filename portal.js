@@ -1107,17 +1107,29 @@
   RENDER.images = el => {
     const KEY='aiwine-portal:wine-images';
     let imgs; try{ imgs=JSON.parse(localStorage.getItem(KEY))||{}; }catch(e){ imgs={}; }
-    const save=()=>{ try{ localStorage.setItem(KEY,JSON.stringify(imgs)); }catch(e){} };
+    const save=()=>{ try{ localStorage.setItem(KEY,JSON.stringify(imgs)); return true; }catch(e){ return false; } };
     const slug=s=>String(s||'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
-    const toDataURL=(f,cb)=>{ const r=new FileReader(); r.onload=()=>cb(r.result); r.readAsDataURL(f); };
+    // Downscale to a small JPEG before storing — full-res photos overflow the
+    // ~5MB localStorage quota (which silently failed before, so a photo would
+    // “save” then vanish on redraw). Max 420px longest edge keeps thumbnails tiny.
+    const toDataURL=(f,cb)=>{
+      const r=new FileReader();
+      r.onload=()=>{ const img=new Image(); img.onload=()=>{
+        const max=420, sc=Math.min(1,max/Math.max(img.width,img.height));
+        const c=document.createElement('canvas'); c.width=Math.round(img.width*sc); c.height=Math.round(img.height*sc);
+        c.getContext('2d').drawImage(img,0,0,c.width,c.height);
+        try{ cb(c.toDataURL('image/jpeg',0.82)); }catch(e){ cb(r.result); }
+      }; img.onerror=()=>cb(r.result); img.src=r.result; };
+      r.readAsDataURL(f);
+    };
     let target=null;
     const single=document.createElement('input'); single.type='file'; single.accept='image/*';
-    single.addEventListener('change',e=>{ const f=e.target.files[0]; if(f&&target){ toDataURL(f,d=>{ imgs[target]=d; save(); draw(); toast('Photo added'); }); } single.value=''; target=null; });
+    single.addEventListener('change',e=>{ const f=e.target.files[0]; if(f&&target){ const t=target; toDataURL(f,d=>{ imgs[t]=d; if(save()){ draw(); toast('Photo added'); } else { delete imgs[t]; draw(); toast('Couldn’t save — photo too large for local storage. Try a smaller image.'); } }); } single.value=''; target=null; });
     function handleFiles(files){
       const arr=[...files].filter(f=>/^image\//.test(f.type)); let pending=arr.length; if(!pending) return; let matched=0, un=0;
       arr.forEach(f=>{ const base=slug(f.name.replace(/\.[^.]+$/,''));
         const w=WINES.find(x=>{ const s1=slug(x.name+'-'+(x.vintage||'')); const s2=slug(x.name); return base===s1||base===s2||(s2&&base.indexOf(s2)>=0); });
-        toDataURL(f,d=>{ if(w){ imgs[w.id]=d; matched++; } else un++; if(--pending===0){ save(); draw(); toast(matched+' matched'+(un?' · '+un+' unmatched':'')); } }); });
+        toDataURL(f,d=>{ if(w){ imgs[w.id]=d; matched++; } else un++; if(--pending===0){ const ok=save(); draw(); toast(ok?(matched+' matched'+(un?' · '+un+' unmatched':'')):'Couldn’t save — photos too large for local storage.'); } }); });
     }
     function draw(){
       el.innerHTML = `
@@ -1131,7 +1143,7 @@
             return `<tr><td><div style="width:38px;height:48px;border-radius:6px;overflow:hidden;background:var(--card-2);display:flex;align-items:center;justify-content:center;color:var(--muted)">${src?`<img src="${src}" style="width:100%;height:100%;object-fit:cover" alt="">`:ic('image',16)}</div></td>
             <td><div class="wine-nm">${esc(w.name)}</div><div class="wine-meta">${w.variety} · ${w.vintage}</div></td>
             <td class="mono" style="font-size:12px;color:var(--muted)">${fn}</td>
-            <td style="display:flex;gap:6px;align-items:center"><button class="btn sm" data-up="${w.id}">${src?'Replace':'Upload'}</button>${src?`<button class="btn-quiet" data-rm="${w.id}" title="Remove">${ic('x',15)}</button>`:''}</td></tr>`;
+            <td class="r" style="white-space:nowrap;vertical-align:middle"><div style="display:inline-flex;gap:6px;align-items:center;justify-content:flex-end"><button class="btn sm" data-up="${w.id}">${src?'Replace':'Upload'}</button>${src?`<button class="btn-quiet" data-rm="${w.id}" title="Remove" aria-label="Remove photo">${ic('x',15)}</button>`:''}</div></td></tr>`;
           }).join('')}</tbody></table></div></div>`;
       el.querySelectorAll('[data-up]').forEach(b=>b.addEventListener('click',()=>{ target=b.dataset.up; single.click(); }));
       el.querySelectorAll('[data-rm]').forEach(b=>b.addEventListener('click',()=>{ delete imgs[b.dataset.rm]; save(); draw(); }));
