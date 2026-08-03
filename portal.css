@@ -217,6 +217,11 @@ table.tbl{width:100%;border-collapse:collapse;}
 .roadmap{margin-top:0;}
 .road-chips{display:flex;flex-wrap:wrap;gap:8px;}
 .road-chip{font-size:11px;color:var(--ink-soft);background:var(--bone-alt);border:1px solid var(--line);border-radius:999px;padding:5px 11px;white-space:nowrap;}
+/* password strength meter */
+.pw-meter{margin:0 0 14px;}
+.pw-bar{height:5px;border-radius:999px;background:var(--bone-alt);overflow:hidden;}
+.pw-bar>i{display:block;height:100%;width:0;border-radius:999px;transition:width .18s ease,background .18s ease;}
+.pw-lab{font-size:11px;color:var(--muted);margin-top:6px;line-height:1.4;}
 
 .screen{display:none;}
 .screen.on{display:block;animation:fade .35s var(--ease);}

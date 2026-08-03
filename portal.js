@@ -1260,6 +1260,30 @@
     if(!b||!i) return;
     b.addEventListener('click', ()=>{ const show=i.type==='password'; i.type=show?'text':'password'; b.textContent=show?'Hide':'Show'; i.focus(); });
   }
+  // ---- password policy (shared) ----
+  // Minimum 8 characters AND either a letter+number mix or length >= 12.
+  const PW_MIN = 8;
+  function pwValid(pw){ pw=pw||''; return pw.length>=PW_MIN && ((/[A-Za-z]/.test(pw)&&/\d/.test(pw)) || pw.length>=12); }
+  function pwStrength(pw){ pw=pw||''; let s=0; if(pw.length>=PW_MIN)s++; if(pw.length>=12)s++; if(/[a-z]/.test(pw)&&/[A-Z]/.test(pw))s++; if(/\d/.test(pw))s++; if(/[^A-Za-z0-9]/.test(pw))s++; return Math.min(s,4); }
+  const PW_RULE_MSG = 'Use at least 8 characters, with letters and a number (or 12+ characters).';
+  // Live strength meter markup + wiring. Call pwMeterHtml(id) in the form, then
+  // wirePwMeter(inputId, meterId) after render.
+  function pwMeterHtml(meterId){
+    return `<div id="${meterId}" class="pw-meter" aria-live="polite"><div class="pw-bar"><i></i></div><div class="pw-lab">${PW_RULE_MSG}</div></div>`;
+  }
+  function wirePwMeter(inputId, meterId){
+    const i=document.getElementById(inputId), m=document.getElementById(meterId);
+    if(!i||!m) return;
+    const bar=m.querySelector('.pw-bar>i'), lab=m.querySelector('.pw-lab');
+    const labels=['Too short','Weak','Fair','Good','Strong'];
+    const colors=['#b23b3b','#c9772e','#c9a227','#6f9e57','#3f8f4f'];
+    const upd=()=>{ const pw=i.value; const s=pwStrength(pw); const ok=pwValid(pw);
+      bar.style.width=(pw?Math.max(12,(s/4)*100):0)+'%'; bar.style.background=colors[s];
+      lab.textContent = pw ? (ok? labels[s]+' password' : PW_RULE_MSG) : PW_RULE_MSG;
+      lab.style.color = pw && !ok ? '#b23b3b' : 'var(--muted)';
+    };
+    i.addEventListener('input', upd); upd();
+  }
 
   const REGION_OPTS=['Wairarapa','Martinborough','Marlborough','Central Otago','Hawke’s Bay','Nelson','Auckland','Gisborne','Waikato & Bay of Plenty','North Canterbury','Waitaki Valley','Northland','Other'];
   const regionSelect=(id,sel)=>`<select id="${id}"><option value="">Select region…</option>${REGION_OPTS.map(r=>`<option${sel===r?' selected':''}>${r}</option>`).join('')}</select>`;
@@ -1326,21 +1350,23 @@
     document.getElementById('app').innerHTML = authShell(`
         <form id="cf" style="${cardStyle}">
           ${authHead('Set a new password')}
-          <div style="font-size:12.5px;color:var(--ink-soft);margin:-6px 0 16px;line-height:1.5">Choose a new password for your winery login (minimum 6 characters).</div>
-          <div class="field" style="margin-bottom:14px"><label>New password</label>
+          <div style="font-size:12.5px;color:var(--ink-soft);margin:-6px 0 16px;line-height:1.5">Choose a new password for your winery login. ${PW_RULE_MSG}</div>
+          <div class="field" style="margin-bottom:8px"><label>New password</label>
             <div style="position:relative"><input id="cp" type="password" style="width:100%;padding-right:64px" autofocus>
             <button type="button" id="cp-t" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--claret);font-weight:700">Show</button></div>
           </div>
+          ${pwMeterHtml('cp-meter')}
           ${err?`<div style="color:var(--red);font-size:12.5px;margin-bottom:12px">${esc(err)}</div>`:''}
           <button class="btn primary" type="submit" style="width:100%;justify-content:center">Save new password</button>
         </form>`);
-    pwToggle('cp-t','cp');
+    pwToggle('cp-t','cp'); wirePwMeter('cp','cp-meter');
     document.getElementById('cf').addEventListener('submit', async e=>{
       e.preventDefault();
-      const btn=e.target.querySelector('button[type=submit]'); btn.disabled=true; btn.textContent='Saving…';
+      const btn=e.target.querySelector('button[type=submit]');
+      if(!pwValid(document.getElementById('cp').value)) return renderRecovery(PW_RULE_MSG);
+      btn.disabled=true; btn.textContent='Saving…';
       try {
         await PStore.setNewPassword(document.getElementById('cp').value);
-        // Don't drop straight into the app (an unlinked account would land on
         // the winery-setup form, which looks like the reset misfired). Show a
         // clear confirmation and send them to sign in with the new password.
         await PStore.signOut();
@@ -1362,10 +1388,11 @@
           ${authHead('Create your winery account')}
           <div style="font-size:12.5px;color:var(--ink-soft);margin:-6px 0 16px;line-height:1.5">Tell us about your winery. We’ll review it (usually within a business day) and email you the moment your portal is ready.</div>
           <div class="field" style="margin-bottom:12px"><label>Your email</label><input id="se" type="email" autofocus></div>
-          <div class="field" style="margin-bottom:12px"><label>Password <span style="color:var(--muted);font-weight:400">(min 6 characters)</span></label>
+          <div class="field" style="margin-bottom:8px"><label>Password</label>
             <div style="position:relative"><input id="sp" type="password" style="width:100%;padding-right:64px">
             <button type="button" id="sp-t" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--claret);font-weight:600;padding:4px 6px">Show</button></div>
           </div>
+          ${pwMeterHtml('sp-meter')}
           <div class="field" style="margin-bottom:12px"><label>Winery name</label><input id="sn" placeholder="e.g. Ata Rangi"></div>
           <div class="field" style="margin-bottom:12px"><label>Region</label>${regionSelect('sr')}</div>
           <div class="field" style="margin-bottom:12px"><label>Website <span style="color:var(--muted);font-weight:400">(optional)</span></label><input id="sw" placeholder="atarangi.co.nz"></div>
@@ -1375,14 +1402,14 @@
           <div style="text-align:center;font-size:12.5px;color:var(--ink-soft);margin-top:16px">Already have an account? <a href="#" id="to-login" style="color:var(--claret);font-weight:600">Sign in</a></div>
         </form>`);
     document.getElementById('to-login').addEventListener('click', e=>{ e.preventDefault(); renderLogin(); });
-    pwToggle('sp-t','sp');
+    pwToggle('sp-t','sp'); wirePwMeter('sp','sp-meter');
     document.getElementById('sf').addEventListener('submit', async e=>{
       e.preventDefault();
       const email=document.getElementById('se').value.trim();
       const pw=document.getElementById('sp').value;
       const details={ name:document.getElementById('sn').value.trim(), region:document.getElementById('sr').value, website:document.getElementById('sw').value.trim(), contact:document.getElementById('scn').value.trim() };
       if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return renderSignup('Please enter a valid email address.');
-      if(pw.length<6) return renderSignup('Password must be at least 6 characters.');
+      if(!pwValid(pw)) return renderSignup(PW_RULE_MSG);
       if(!details.name) return renderSignup('Please enter your winery name.');
       const btn=e.target.querySelector('button[type=submit]'); btn.disabled=true; btn.textContent='Creating…';
       try {
@@ -1465,7 +1492,7 @@
     if(/already registered|already exists/i.test(m)) return 'An account with this email already exists — try signing in instead.';
     if(/email not confirmed/i.test(m)) return 'Please confirm your email (check your inbox), then sign in.';
     if(/different from the old|should be different/i.test(m)) return 'Your new password must be different from your current password.';
-    if(/password/i.test(m)) return 'Password must be at least 6 characters.';
+    if(/password/i.test(m)) return PW_RULE_MSG;
     return m;
   }
 

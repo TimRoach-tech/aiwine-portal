@@ -169,7 +169,9 @@
     },
     async setNewPassword(pw) {
       if (!sb) { await loadLib(); sb = window.supabase.createClient(CFG.SUPABASE_URL, CFG.SUPABASE_ANON_KEY); }
-      if (!pw || pw.length < 6) throw new Error('Password must be at least 6 characters.');
+      // Policy: min 8 chars AND (letter+number OR length >= 12). Mirrors portal.js pwValid().
+      const ok = (pw || '').length >= 8 && ((/[A-Za-z]/.test(pw) && /\d/.test(pw)) || (pw || '').length >= 12);
+      if (!ok) throw new Error('Password must be at least 8 characters, with letters and a number (or 12+ characters).');
       const { error } = await sb.auth.updateUser({ password: pw });
       if (error) throw new Error(error.message);
       const { data } = await sb.auth.getSession(); session = data && data.session;
