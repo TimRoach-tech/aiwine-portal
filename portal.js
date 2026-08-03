@@ -1121,10 +1121,9 @@
     // frame. Falls back to the original file if the model can't load.
     function prep(file, cb){
       if(!bgrOn()){ normalizeBottle(file, cb); return; }
-      toast('Removing background… (first run downloads the model, ~10s)');
       loadBgr().then(m=>{ const fn=m.removeBackground||(m.default&&m.default.removeBackground)||m.default; return fn(file); })
         .then(blob=>normalizeBottle(blob, cb))
-        .catch(()=>{ toast('Background removal unavailable — using the original image'); normalizeBottle(file, cb); });
+        .catch(()=>{ normalizeBottle(file, cb); });
     }
     let imgs; try{ imgs=JSON.parse(localStorage.getItem(KEY))||{}; }catch(e){ imgs={}; }
     const save=()=>{ try{ localStorage.setItem(KEY,JSON.stringify(imgs)); return true; }catch(e){ return false; } };
@@ -1168,8 +1167,8 @@
     const imgOf = w => LIVE ? (w.image||'') : (imgs[w.id]||'');
     single.addEventListener('change',e=>{ const f=e.target.files[0]; if(!f||!target){ single.value=''; target=null; return; } const t=target; single.value=''; target=null;
       prep(f, res=>{
-        if(LIVE){ toast('Uploading photo…'); PStore.uploadWineImage(t,res.blob).then(()=>{ WINES=PStore.wines; draw(); toast(res.transparent?'Photo uploaded — live on the site':'Uploaded — tip: a cut-out PNG (transparent background) looks cleaner than a solid box.'); }).catch(err=>{ toast('Upload failed: '+(err&&err.message||err)); }); }
-        else { imgs[t]=res.dataUrl; if(save()){ draw(); toast(res.transparent?'Photo added':'Added — tip: use a cut-out PNG (transparent background) for a clean look.'); } else { delete imgs[t]; draw(); toast('Couldn’t save — photo too large for local storage.'); } }
+        if(LIVE){ PStore.uploadWineImage(t,res.blob).then(()=>{ WINES=PStore.wines; draw(); toast(res.transparent?'Photo uploaded — live on the site':'Photo uploaded'); }).catch(err=>{ toast('Upload failed: '+(err&&err.message||err)); }); }
+        else { imgs[t]=res.dataUrl; if(save()){ draw(); toast('Photo added'); } else { delete imgs[t]; draw(); toast('Couldn’t save — photo too large for local storage.'); } }
       });
     });
     function handleFiles(files){
@@ -1189,7 +1188,9 @@
         <div class="page-head"><div><div class="eyebrow">Bottle photos</div><h1 class="page-title">Wine <em>images</em>.</h1>
         <div class="sub-line">One bottle photo per wine. Drag them all in at once — we match each photo to a wine by its file name.</div></div>
         <div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap"><label style="display:inline-flex;align-items:center;gap:7px;font-size:12.5px;color:var(--ink-soft);cursor:pointer"><input type="checkbox" id="bgr-toggle" ${localStorage.getItem(BGR_KEY)!=='0'?'checked':''} style="width:16px;height:16px;accent-color:var(--claret)">Auto-remove background</label><button class="btn primary" id="pickall">${ic('upload',15)} Add photos</button></div></div>
-        <div class="drop" id="drop"><div class="dic">${ic('image',26)}</div><h3>Drop bottle photos here</h3><p>JPG or PNG. Name each file like the wine + vintage, e.g. <b>crimson-pinot-noir-2023.jpg</b> — it lands on the right wine automatically.<br><span style="color:var(--muted);font-size:12px">Best results: a <b>cut-out photo on a transparent background</b> (PNG), bottle upright and centred. We auto-trim, size and centre every photo to match — a solid white/checker background will show as a box.</span></p><input type="file" id="fileall" accept="image/*" multiple hidden></div>
+        <div class="drop" id="drop"><div class="dic">${ic('image',26)}</div><h3>Drop bottle photos here</h3><p>JPG or PNG. Name each file like the wine + vintage, e.g. <b>crimson-pinot-noir-2023.jpg</b> — it lands on the right wine automatically.</p></div>
+        <div class="card card-pad" style="margin-top:12px;display:flex;gap:12px;align-items:flex-start"><span style="flex:none;color:var(--claret);margin-top:1px">${ic('image',18)}</span><div style="font-size:12.5px;color:var(--ink-soft);line-height:1.6"><b>How your photo is prepared.</b> Every photo is trimmed, sized and centred to match the others, so your range looks consistent. With <b>Auto-remove background</b> on (recommended), we lift the bottle off its background for you. If it’s off and your photo has a <b>solid white or coloured background</b>, that background will show as a box behind the bottle — for the cleanest result, upload a bottle already cut out on a transparent background, or leave Auto-remove background on.</div></div>
+        <input type="file" id="fileall" accept="image/*" multiple hidden>
         <div class="card" style="margin-top:18px"><div class="tbl-wrap"><table class="tbl">
           <thead><tr><th>Photo</th><th>Wine</th><th>File name to use</th><th></th></tr></thead>
           <tbody>${WINES.map(w=>{ const src=imgOf(w); const fn=slug(w.name+'-'+(w.vintage||''))+'.jpg';
