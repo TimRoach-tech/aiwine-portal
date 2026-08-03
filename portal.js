@@ -386,7 +386,7 @@
   }
   function wineRow(w){
     return `<tr data-wid="${w.id}">
-      <td><div class="wine-cell">${wineThumb(w)}<div><div class="wine-nm">${esc(w.name)}</div><div class="wine-meta">${esc(w.variety)} · ${esc(w.vintage)}</div>${provLine(w)}</div></div></td>
+      <td><div class="wine-cell">${wineThumb(w)}<div><button class="wine-nm wine-edit" data-edit type="button" title="Edit ${esc(w.name)}" style="background:none;border:none;padding:0;font:inherit;color:inherit;text-align:left;cursor:pointer">${esc(w.name)}</button><div class="wine-meta">${esc(w.variety)} · ${esc(w.vintage)}</div>${provLine(w)}</div></div></td>
       <td><span class="price-edit"><span>$</span><input type="number" min="0" value="${w.price}" data-price aria-label="Price for ${esc(w.name)}, dollars incl GST"></span></td>
       <td><span class="stepper"><button data-dec aria-label="Decrease stock for ${esc(w.name)}">−</button><input type="number" min="0" value="${w.qty}" data-qty aria-label="Bottles in cellar for ${esc(w.name)}"><button data-inc aria-label="Increase stock for ${esc(w.name)}">+</button></span></td>
       <td data-stock>${stockPill(stkOf(w))}</td>
@@ -405,6 +405,7 @@
       qa.addEventListener('change',()=>{ w.qty=Math.max(0,+qa.value||0); PStore.updateWine(w.id,{qty:w.qty}); qa.value=w.qty; refreshStock(); toast('Stock updated · '+w.name); });
       const pa=tr.querySelector('[data-price]');
       pa.addEventListener('change',()=>{ w.price=Math.max(0,+pa.value||0); PStore.updateWine(w.id,{price:w.price}); pa.value=w.price; toast('Price updated · '+w.name); });
+      const ed=tr.querySelector('[data-edit]'); if(ed) ed.addEventListener('click',()=>addWineModal(w));
       tr.querySelector('[data-del]').addEventListener('click',()=>{
         confirmModal({ title:'Remove wine?', message:'Remove “'+w.name+'” from your range? Customers will no longer see it. You can undo this straight after.', confirm:'Remove', danger:true }, ()=>{
           const idx=WINES.indexOf(w), snapshot=w;
@@ -1211,10 +1212,11 @@
     draw();
   };
 
-  // ---------- add wine modal ----------
-  function addWineModal(){
+  // ---------- add / edit wine modal ----------
+  function addWineModal(edit){
+    const isEdit=!!edit;
     $('#modal').innerHTML=`
-      <div class="modal-head"><h2>Add a bottle</h2><button class="btn-quiet" id="m-x" aria-label="Close">${ic('x',18)}</button></div>
+      <div class="modal-head"><h2>${isEdit?'Edit wine':'Add a bottle'}</h2><button class="btn-quiet" id="m-x" aria-label="Close">${ic('x',18)}</button></div>
       <div class="modal-body">
         <div class="field"><label>Wine name</label><input id="f-name" placeholder="e.g. Crimson Pinot Noir" autofocus></div>
         <div class="grid-2">
@@ -1238,15 +1240,23 @@
         <div class="field"><label>Food pairings <span style="color:var(--muted);font-weight:400">(up to 3, semicolon ;)</span></label><input id="f-pair" placeholder="roast duck; salmon; mushroom risotto"></div>
         <div class="field"><label>Awards <span style="color:var(--muted);font-weight:400">(semicolon ;)</span></label><input id="f-awards" placeholder="Gold · NZ IWS 2025"></div>
       </div>
-      <div class="modal-foot"><button class="btn" id="m-cancel">Cancel</button><button class="btn primary" id="m-save">${ic('plus',15)} Add to my range</button></div>`;
+      <div class="modal-foot"><button class="btn" id="m-cancel">Cancel</button><button class="btn primary" id="m-save">${isEdit?ic('check',15)+' Save changes':ic('plus',15)+' Add to my range'}</button></div>`;
     openModal();
+    if(isEdit){
+      $('#f-name').value=edit.name||''; $('#f-var').value=edit.variety||''; $('#f-colour').value=edit.colour||'Red';
+      $('#f-vin').value=edit.vintage||''; $('#f-price').value=edit.price||0; $('#f-qty').value=edit.qty||0;
+      if(edit.style) $('#f-style').value=edit.style; $('#f-organic').value=edit.organic?'Y':'N';
+      if(edit.region) $('#f-region').value=edit.region; $('#f-sub').value=edit.subRegion||'';
+      $('#f-notes').value=edit.notes||''; $('#f-pair').value=(edit.pairings||[]).join('; '); $('#f-awards').value=Array.isArray(edit.awards)?edit.awards.join('; '):(edit.awards||'');
+    }
     $('#m-x').onclick=closeModal; $('#m-cancel').onclick=closeModal;
     $('#m-save').onclick=()=>{
       const name=$('#f-name').value.trim(); if(!name){ toast('Give the wine a name'); return; }
       const pairs=($('#f-pair').value||'').split(';').map(s=>s.trim()).filter(Boolean).slice(0,3);
       const notes=($('#f-notes').value||'').trim().split(/\s+/).filter(Boolean).slice(0,25).join(' ');
-      const w={ id:Date.now(), name, variety:$('#f-var').value, colour:$('#f-colour').value, style:$('#f-style').value, organic:$('#f-organic').value==='Y', region:$('#f-region').value, subRegion:$('#f-sub').value.trim(), notes, pairings:pairs, awards:($('#f-awards').value||'').trim(), vintage:+$('#f-vin').value||2024, price:+$('#f-price').value||0, qty:+$('#f-qty').value||0, scans:0 };
-      PStore.addWine(w); closeModal(); go('wines'); toast('Added · '+name+' is live on AIWine 🍷');
+      const fields={ name, variety:$('#f-var').value, colour:$('#f-colour').value, style:$('#f-style').value, organic:$('#f-organic').value==='Y', region:$('#f-region').value, subRegion:$('#f-sub').value.trim(), notes, pairings:pairs, awards:($('#f-awards').value||'').trim(), vintage:+$('#f-vin').value||2024, price:+$('#f-price').value||0, qty:+$('#f-qty').value||0 };
+      if(isEdit){ PStore.updateWine(edit.id, fields); WINES=PStore.wines; closeModal(); go('wines'); toast('Saved · '+name+' updated'); }
+      else { PStore.addWine(Object.assign({ id:Date.now(), scans:0 }, fields)); WINES=PStore.wines; closeModal(); go('wines'); toast('Added · '+name+' is live on AIWine 🍷'); }
     };
   }
   // Associate every .field's <label> with its control (input/select/textarea) via
