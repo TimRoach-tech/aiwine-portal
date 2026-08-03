@@ -88,7 +88,28 @@
   const $ = s => document.querySelector(s);
   const esc = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
   const money = n => '$'+Number(n).toLocaleString('en-NZ');
-  const toast = m => { const t=$('#toast'); t.textContent=m; t.classList.add('show'); clearTimeout(t._t); t._t=setTimeout(()=>t.classList.remove('show'),2200); };
+  const toast = m => { const t=$('#toast'); t.innerHTML=esc(m); t.classList.remove('has-action'); t.classList.add('show'); clearTimeout(t._t); t._t=setTimeout(()=>t.classList.remove('show'),2200); };
+  // Toast with an inline action (e.g. Undo). Stays up longer; action() runs on click.
+  function toastAction(m, label, fn){
+    const t=$('#toast'); t.innerHTML='<span>'+esc(m)+'</span>'; t.classList.add('show','has-action');
+    const b=document.createElement('button'); b.className='toast-act'; b.textContent=label;
+    b.onclick=()=>{ clearTimeout(t._t); t.classList.remove('show','has-action'); try{ fn(); }catch(e){} };
+    t.appendChild(b); clearTimeout(t._t);
+    t._t=setTimeout(()=>t.classList.remove('show','has-action'),6000);
+  }
+  // Lightweight in-app confirm (replaces browser confirm()). Danger-styled optional.
+  function confirmModal(opts, onYes){
+    const o=typeof opts==='string'?{message:opts}:opts;
+    $('#modal').innerHTML=`<div class="modal-card" style="max-width:420px">
+      <div class="modal-head"><h2>${esc(o.title||'Are you sure?')}</h2><button class="btn-quiet" id="cm-x" aria-label="Close">${ic('x',18)}</button></div>
+      <div class="modal-body"><p style="font-size:14px;color:var(--ink-soft);line-height:1.6;margin:0">${esc(o.message||'')}</p></div>
+      <div class="modal-foot"><button class="btn" id="cm-no">${esc(o.cancel||'Cancel')}</button><button class="btn ${o.danger?'danger':'primary'}" id="cm-yes">${esc(o.confirm||'Confirm')}</button></div>
+    </div>`;
+    openModal();
+    const done=()=>closeModal();
+    $('#cm-x').onclick=done; $('#cm-no').onclick=done;
+    $('#cm-yes').onclick=()=>{ done(); try{ onYes(); }catch(e){} };
+  }
   const bottleEl = w => `<span class="bottle" style="background:linear-gradient(160deg,${TINT[w.variety]||'#5C1B27'},#1B1410)"></span>`;
   const stockPill = s => `<span class="pill ${s}">${s==='in'?'In stock':s==='low'?'Low':'Out'}</span>`;
   const stkOf = w => w.qty<=0?'out':w.qty<=8?'low':'in';
@@ -334,7 +355,7 @@
       <div class="card">
         <div class="tbl-wrap"><table class="tbl">
           <thead><tr><th scope="col">Wine</th><th scope="col">Price (incl GST)</th><th scope="col">In cellar</th><th scope="col">Status</th><th scope="col" class="r">Scans</th><th scope="col"><span class="sr-only">Actions</span></th></tr></thead>
-          <tbody id="wines-body">${WINES.map(wineRow).join('')}</tbody>
+          <tbody id="wines-body">${WINES.length?WINES.map(wineRow).join(''):`<tr><td colspan="6"><div class="empty-state"><div class="es-ic">${ic('bottle',26)}</div><div class="es-t">No wines yet</div><div class="es-s">Add your range and it appears here — upload a spreadsheet, or add bottles one at a time.</div><div class="es-cta"><button class="btn primary" data-go="upload">${ic('upload',15)} Upload your list</button><button class="btn" id="es-add">Add a bottle</button></div></div></td></tr>`}</tbody>
         </table></div>
       </div>
       <div style="margin-top:14px;font-size:12.5px;color:var(--muted)">${ic('check',13,'var(--green)')} Changes save instantly and sync to the app, the shop and your cellar-door listing.</div>
@@ -379,8 +400,16 @@
       qa.addEventListener('change',()=>{ w.qty=Math.max(0,+qa.value||0); PStore.updateWine(w.id,{qty:w.qty}); qa.value=w.qty; refreshStock(); toast('Stock updated · '+w.name); });
       const pa=tr.querySelector('[data-price]');
       pa.addEventListener('change',()=>{ w.price=Math.max(0,+pa.value||0); PStore.updateWine(w.id,{price:w.price}); pa.value=w.price; toast('Price updated · '+w.name); });
-      tr.querySelector('[data-del]').addEventListener('click',()=>{ if(confirm('Remove '+w.name+' from your range?')){ PStore.removeWine(w.id); WINES=PStore.wines; go('wines'); toast('Removed'); } });
+      tr.querySelector('[data-del]').addEventListener('click',()=>{
+        confirmModal({ title:'Remove wine?', message:'Remove “'+w.name+'” from your range? Customers will no longer see it. You can undo this straight after.', confirm:'Remove', danger:true }, ()=>{
+          const idx=WINES.indexOf(w), snapshot=w;
+          PStore.removeWine(w.id); WINES=PStore.wines; go('wines');
+          toastAction('Removed “'+snapshot.name+'”', 'Undo', ()=>{ PStore.addWine(snapshot); WINES=PStore.wines; go('wines'); toast('Restored “'+snapshot.name+'”'); });
+        });
+      });
     });
+    const esAdd=el.querySelector('#es-add'); if(esAdd) esAdd.addEventListener('click',()=>addWineModal());
+    bindGo(el);
   }
 
   RENDER.orders = el => {
@@ -394,7 +423,7 @@
       </div>
       <div class="card"><div class="tbl-wrap"><table class="tbl">
         <thead><tr><th>Order</th><th>Items</th><th>Destination</th><th class="r">Total</th><th>Status</th><th></th></tr></thead>
-        <tbody>${rows.map(orderRow).join('')||`<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:30px">Nothing here.</td></tr>`}</tbody>
+        <tbody>${rows.map(orderRow).join('')||`<tr><td colspan="6"><div class="empty-state"><div class="es-ic">${ic('bag',26)}</div><div class="es-t">${seg==='open'?'No orders to fulfil':'Nothing shipped yet'}</div><div class="es-s">${seg==='open'?'When a customer buys your wine, the order lands here ready to pack and ship.':'Orders you\u2019ve marked shipped will show here.'}</div></div></td></tr>`}</tbody>
       </table></div></div>
       ${PStore.mode==='live'?`
       <div class="card card-pad" style="margin-top:16px;display:flex;align-items:center;gap:16px;flex-wrap:wrap">
@@ -446,7 +475,7 @@
       <tr>
         <td><b>${p.date}</b></td><td>${p.period}</td><td style="font-family:var(--mono);font-size:11px">${p.ref}</td>
         <td>${p.orders}</td><td>${fm(p.gross)}</td><td>−${fm(p.comm)}</td><td>−${fm(p.gst)}</td><td><b>${fm(p.net)}</b></td>
-        <td style="white-space:nowrap"><button class="btn-quiet" disabled title="Coming soon" style="font-size:10px">Statement</button> <button class="btn-quiet" disabled title="Coming soon" style="font-size:10px">Remittance</button></td>
+        <td style="white-space:nowrap"><span class="pill low" style="font-size:9px">Docs soon</span></td>
       </tr>`).join('');
     el.innerHTML = `
       <div class="page-head"><div><div class="eyebrow">Money</div><h1 class="page-title"><em>Payments</em>.</h1>
@@ -1037,17 +1066,6 @@
   };
 
   RENDER.integrations = el => {
-    const partners = [
-      ['Shopify','E-commerce','Sync products, stock and sales from your Shopify store.'],
-      ['WooCommerce','E-commerce','WordPress / WooCommerce product and stock sync.'],
-      ['Squarespace','E-commerce','Keep your Squarespace shop and AIWine in step.'],
-      ['Vend by Lightspeed','EPOS','Cellar-door till sales keep your AIWine stock current.'],
-      ['Square','EPOS','Square POS sales adjust your live stock automatically.'],
-      ['Lightspeed Retail','EPOS','Retail point-of-sale inventory sync.'],
-      ['EPOS Now','EPOS','Point-of-sale stock kept in sync in real time.'],
-      ['Xero','Accounting','Push orders and invoices straight into Xero.'],
-      ['Cin7 Core','Inventory','Warehouse and 3PL stock levels flow through.'],
-    ];
     el.innerHTML=`
       <div class="page-head"><div><div class="eyebrow">Connect</div><h1 class="page-title"><em>Integrations</em>.</h1>
       <div class="sub-line">Keep your range in sync — from a simple spreadsheet today to full till &amp; store automation.</div></div></div>
@@ -1057,10 +1075,17 @@
         ${intCard('grid','Live dashboard','Available now','in','Edit prices and stock directly here — every change syncs to AIWine in seconds. No spreadsheets needed.','Manage wines','wines')}
         ${intCard('bottle','Wine images','Available now','in','Drag in your bottle photos — each lands on the right wine by file name.','Add photos','images')}
       </div>
-      <div class="label" style="margin:26px 0 12px">Point-of-sale, e-commerce &amp; accounting <span style="color:var(--muted);font-weight:400">· coming soon</span></div>
-      <div class="int-grid">
-        ${intCard('plug','Open API &amp; webhooks','Coming soon','low','A REST API and webhooks to push stock and pull scan data programmatically.','Register interest',null,'mailto:partners@aiwine.co.nz?subject=Open%20API')}
-        ${partners.map(p=>intCard('plug',p[0],'Coming soon','low',p[1]+' — '+p[2],'Register interest',null,'mailto:partners@aiwine.co.nz?subject='+encodeURIComponent(p[0]+' integration'))).join('')}
+      <div class="label" style="margin:26px 0 12px">On the roadmap</div>
+      <div class="card card-pad roadmap">
+        <div style="display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap">
+          <div style="flex:none;width:44px;height:44px;border-radius:10px;background:var(--bg-alt);display:flex;align-items:center;justify-content:center;color:var(--muted)">${ic('plug',22)}</div>
+          <div style="flex:1;min-width:260px">
+            <div class="card-title" style="margin-bottom:4px">Point-of-sale, e-commerce &amp; accounting sync</div>
+            <div style="font-size:13px;color:var(--ink-soft);line-height:1.6;margin-bottom:12px">We're building direct sync so your cellar-door till and online shop keep AIWine stock current automatically, plus an open API and accounting export. Tell us which you'd use and we'll prioritise it — and let you know the moment it's ready.</div>
+            <div class="road-chips">${['Open API &amp; webhooks','Shopify','WooCommerce','Squarespace','Vend by Lightspeed','Square','Lightspeed Retail','EPOS Now','Xero','Cin7 Core'].map(n=>`<span class="road-chip">${n}</span>`).join('')}</div>
+            <div style="margin-top:14px"><a class="btn primary" href="mailto:partners@aiwine.co.nz?subject=Integration%20interest&body=Which%20integrations%20would%20you%20use%3F" style="justify-content:center">Register interest ↗</a></div>
+          </div>
+        </div>
       </div>
       <div class="card card-pad" style="margin-top:22px;display:flex;align-items:center;gap:18px;flex-wrap:wrap">
         <div style="flex:1;min-width:240px"><div class="card-title" style="margin-bottom:4px">The AIWine Winery app</div><div style="font-size:13px;color:var(--ink-soft);line-height:1.55">Manage stock and watch live scans from your phone — perfect for the cellar door. Same login, same data as this portal.</div></div>

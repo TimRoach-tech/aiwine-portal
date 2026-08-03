@@ -202,6 +202,21 @@ table.tbl{width:100%;border-collapse:collapse;}
 /* ---------- toast ---------- */
 #toast{position:fixed;bottom:26px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--ink);color:var(--bone);padding:12px 22px;border-radius:999px;font-size:13px;font-weight:600;z-index:99;opacity:0;transition:opacity .25s,transform .25s var(--ease);pointer-events:none;box-shadow:0 16px 40px rgba(0,0,0,0.3);}
 #toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+#toast.has-action{display:flex;align-items:center;gap:14px;padding-right:8px;}
+.toast-act{background:transparent;border:none;color:var(--bone);font-weight:700;font-size:12.5px;letter-spacing:.04em;text-transform:uppercase;cursor:pointer;padding:6px 12px;border-radius:999px;}
+.toast-act:hover{background:rgba(255,255,255,.14);}
+.btn.danger{background:var(--claret);border-color:var(--claret);color:var(--bone);}
+.btn.danger:hover{background:var(--claret-deep);}
+/* empty states */
+.empty-state{text-align:center;padding:44px 20px;display:flex;flex-direction:column;align-items:center;gap:6px;}
+.empty-state .es-ic{width:56px;height:56px;border-radius:14px;background:var(--bone-alt);display:grid;place-items:center;color:var(--muted);margin-bottom:6px;}
+.empty-state .es-t{font-family:var(--serif,'Cormorant Garamond',serif);font-size:22px;color:var(--ink);}
+.empty-state .es-s{font-size:13.5px;color:var(--ink-soft);max-width:400px;line-height:1.55;}
+.empty-state .es-cta{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin-top:14px;}
+/* integrations roadmap */
+.roadmap{margin-top:0;}
+.road-chips{display:flex;flex-wrap:wrap;gap:8px;}
+.road-chip{font-size:11px;color:var(--ink-soft);background:var(--bone-alt);border:1px solid var(--line);border-radius:999px;padding:5px 11px;white-space:nowrap;}
 
 .screen{display:none;}
 .screen.on{display:block;animation:fade .35s var(--ease);}
