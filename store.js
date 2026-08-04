@@ -89,6 +89,30 @@
     },
     get planCellarDoor() { const w = wineries.find(x => x.id === wineryId); return !!(w && w.cellarDoorActive); },
     get planGrow() { const w = wineries.find(x => x.id === wineryId); return !!(w && w.growActive); },
+    // Virtual Cellar Door editable content (story / hours / hero photo URL).
+    get cellarInfo() {
+      const w = wineries.find(x => x.id === wineryId) || {};
+      return { story: w.cellar_story || '', hours: w.cellar_hours || '', image: w.cellar_image || '' };
+    },
+    async saveCellar(data) {
+      const patch = { cellar_story: data.story || null, cellar_hours: data.hours || null };
+      if (data.image !== undefined) patch.cellar_image = data.image || null;
+      const { data: rows, error } = await sb.from('wineries').update(patch).eq('id', wineryId).select('id');
+      if (error) throw new Error(error.message);
+      if (!rows || !rows.length) throw new Error('You are not linked to this winery in the database — cellar door can\u2019t be saved. Ask an admin to link your account.');
+      const w = wineries.find(x => x.id === wineryId); if (w) Object.assign(w, patch);
+    },
+    async uploadCellarImage(file) {
+      if (!LIVE) throw new Error('demo');
+      const ext = ((file.type && file.type.split('/')[1]) || 'jpg').replace('jpeg', 'jpg');
+      const path = wineryId + '/cellar-hero.' + ext;
+      const up = await sb.storage.from('wine-images').upload(path, file, { upsert: true, contentType: file.type || 'image/jpeg' });
+      if (up.error) throw new Error(up.error.message);
+      const { data } = sb.storage.from('wine-images').getPublicUrl(path);
+      const url = data.publicUrl + '?t=' + Date.now();
+      await Store.saveCellar(Object.assign({}, Store.cellarInfo, { image: url }));
+      return url;
+    },
     // redeem an activation code for the ACTIVE winery → returns the feature it unlocked
     async redeemCode(code) {
       const { data, error } = await sb.rpc('redeem_activation_code', { p_winery: wineryId, p_code: code });

@@ -708,6 +708,8 @@
 
   RENDER.plan = el => {
     const active = hasCellar();
+    const LIVE = PStore.mode==='live';
+    const CD = LIVE ? PStore.cellarInfo : { story:PLAN.story||'', hours:PLAN.hours||'', image:PLAN.image||'' };
     const gate = `
       <div class="card card-pad">
         <div class="label" style="color:var(--brass);margin-bottom:8px">Virtual Cellar Door \u00b7 $95/yr</div>
@@ -727,9 +729,16 @@
       <div class="card">
         <div class="card-head"><span class="card-title">Your cellar door</span><span class="pill in">Active \u00b7 ${esc(PLAN.activatedVia||'subscribed')}</span></div>
         <div class="card-pad" style="display:flex;flex-direction:column;gap:14px">
-          <div class="field"><label>Your story</label><textarea id="cd-story" rows="4" style="width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:var(--card-2);font-family:var(--sans);font-size:14px;resize:vertical" placeholder="Tell visitors who you are\u2026">${esc(PLAN.story||'')}</textarea></div>
-          <div class="field"><label>Visit / tasting hours</label><input id="cd-hours" value="${esc(PLAN.hours||'')}" placeholder="Fri\u2013Sun \u00b7 11am\u20134pm" style="width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:var(--card-2);font-size:14px"></div>
-          <div class="field"><label>Hero photo</label><div style="border:2px dashed var(--line);border-radius:8px;padding:22px;text-align:center;color:var(--muted);font-size:13px">Drag a photo here (demo) \u2014 shown on your public profile</div></div>
+          <div class="field"><label>Your story</label><textarea id="cd-story" rows="4" style="width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:var(--card-2);font-family:var(--sans);font-size:14px;resize:vertical" placeholder="Tell visitors who you are\u2026">${esc(CD.story||'')}</textarea></div>
+          <div class="field"><label>Visit / tasting hours</label><input id="cd-hours" value="${esc(CD.hours||'')}" placeholder="Fri\u2013Sun \u00b7 11am\u20134pm" style="width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:var(--card-2);font-size:14px"></div>
+          <div class="field"><label>Hero photo</label>
+            <div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap">
+              <div id="cd-thumb" style="width:120px;height:80px;border-radius:8px;border:1px solid var(--line);background:var(--card-2) center/cover no-repeat;${CD.image?`background-image:url('${CD.image}')`:''};display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:11px">${CD.image?'':'No photo yet'}</div>
+              <div><button class="btn" id="cd-photo-btn" type="button">${ic('upload',15)} ${CD.image?'Replace photo':'Upload photo'}</button>
+              <div style="font-size:11.5px;color:var(--muted);margin-top:6px">Shown across your public profile. JPG or PNG.</div></div>
+              <input type="file" id="cd-photo" accept="image/*" hidden>
+            </div>
+          </div>
           <div style="display:flex;justify-content:flex-end"><button class="btn primary" id="cd-save">Save \u2014 publish to my profile</button></div>
         </div>
       </div>`;
@@ -763,7 +772,20 @@
       const pr=el.querySelector('#plan-refresh');
       if(pr) pr.addEventListener('click', async e=>{ e.preventDefault(); if(PStore.mode!=='live') return; await PStore.refreshPlan(); go('plan'); toast(hasCellar()||hasGrow()?'Activated — welcome aboard':'Not active yet — payments can take a minute'); });
     } else {
-      el.querySelector('#cd-save').addEventListener('click',()=>{ PLAN.story=el.querySelector('#cd-story').value; PLAN.hours=el.querySelector('#cd-hours').value; savePlan(); toast('Cellar door updated \u00b7 live on your profile'); });
+      const photoBtn=el.querySelector('#cd-photo-btn'), photoIn=el.querySelector('#cd-photo');
+      if(photoBtn&&photoIn){
+        photoBtn.addEventListener('click',()=>photoIn.click());
+        photoIn.addEventListener('change',e=>{ const f=e.target.files[0]; if(!f) return;
+          if(LIVE){ photoBtn.disabled=true; photoBtn.textContent='Uploading...'; PStore.uploadCellarImage(f).then(url=>{ const t=el.querySelector('#cd-thumb'); if(t){ t.style.backgroundImage=`url('${url}')`; t.textContent=''; } toast('Hero photo uploaded'); }).catch(err=>toast('Upload failed: '+(err&&err.message||err))).then(()=>{ photoBtn.disabled=false; photoBtn.innerHTML=`${ic('upload',15)} Replace photo`; }); }
+          else { const r=new FileReader(); r.onload=()=>{ PLAN.image=r.result; savePlan(); const t=el.querySelector('#cd-thumb'); if(t){ t.style.backgroundImage=`url('${r.result}')`; t.textContent=''; } toast('Hero photo added'); }; r.readAsDataURL(f); }
+          photoIn.value='';
+        });
+      }
+      el.querySelector('#cd-save').addEventListener('click',()=>{
+        const story=el.querySelector('#cd-story').value, hours=el.querySelector('#cd-hours').value;
+        if(LIVE){ const b=el.querySelector('#cd-save'); b.disabled=true; b.textContent='Saving...'; PStore.saveCellar({story,hours}).then(()=>toast('Cellar door published - live on your profile')).catch(err=>toast('Could not save: '+(err&&err.message||err))).then(()=>{ b.disabled=false; b.textContent='Save - publish to my profile'; }); }
+        else { PLAN.story=story; PLAN.hours=hours; savePlan(); toast('Cellar door updated - live on your profile'); }
+      });
     }
     const gb=el.querySelector('#grow-buy'); if(gb) gb.addEventListener('click',()=>demoCheckout(95,'grow'));
     bindGo(el);
