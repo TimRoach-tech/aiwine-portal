@@ -676,7 +676,7 @@
       if(!name){ return null; }
       if(isExample(name)){ skipped++; return null; }
       const tn=trim25(at(c,ci.notes)); if(tn.cut)trimmedN++;
-      const pair=at(c,ci.pairings).split(';').map(s=>s.trim()).filter(Boolean).slice(0,3);
+      const pair=at(c,ci.pairings).split(';').map(s=>s.trim()).filter(Boolean).slice(0,6);
       return { name, variety:snap(at(c,ci.variety),L_VAR), colour:snap(at(c,ci.colour),L_COL), vintage:at(c,ci.vintage), price:at(c,ci.price), stock:at(c,ci.stock), notes:tn.text, pairings:pair, style:snap(at(c,ci.style),L_STY), organic:/^y/i.test(at(c,ci.organic)), awards:at(c,ci.awards), region:snap(at(c,ci.region),L_REG)||wineryRegion, sub:at(c,ci.sub) };
     }).filter(Boolean);
     const matched=rows.filter(x=>WINES.some(w=>w.name.toLowerCase()===String(x.name).toLowerCase())).length;
@@ -1230,7 +1230,7 @@
           <div class="field"><label>Sub-region</label><input id="f-sub" placeholder="e.g. Martinborough"></div>
         </div>
         <div class="field"><label>Tasting notes <span style="color:var(--muted);font-weight:400">(max 25 words)</span></label><textarea id="f-notes" rows="2" style="width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:var(--card-2);font-family:var(--sans);font-size:14px;color:var(--ink);resize:vertical" placeholder="Cherry, plum and soft spice…"></textarea><div style="font-size:11.5px;color:var(--muted);margin-top:6px">${ic('sparkle',12,'var(--claret)')} AIWine's sommelier writes the “why you'll like it” line for each wine automatically — you don't need to.</div></div>
-        <div class="field"><label>Food pairings <span style="color:var(--muted);font-weight:400">(up to 3, semicolon ;)</span></label><input id="f-pair" placeholder="roast duck; salmon; mushroom risotto"></div>
+        <div class="field"><label>Food pairings <span style="color:var(--muted);font-weight:400">(semicolon ;)</span></label><input id="f-pair" placeholder="roast duck; salmon; mushroom risotto"></div>
         <div class="field"><label>Awards <span style="color:var(--muted);font-weight:400">(semicolon ;)</span></label><input id="f-awards" placeholder="Gold · NZ IWS 2025"></div>
       </div>
       <div class="modal-foot"><button class="btn" id="m-cancel">Cancel</button><button class="btn primary" id="m-save">${isEdit?ic('check',15)+' Save changes':ic('plus',15)+' Add to my range'}</button></div>`;
@@ -1245,7 +1245,7 @@
     $('#m-x').onclick=closeModal; $('#m-cancel').onclick=closeModal;
     $('#m-save').onclick=()=>{
       const name=$('#f-name').value.trim(); if(!name){ toast('Give the wine a name'); return; }
-      const pairs=($('#f-pair').value||'').split(';').map(s=>s.trim()).filter(Boolean).slice(0,3);
+      const pairs=($('#f-pair').value||'').split(';').map(s=>s.trim()).filter(Boolean).slice(0,6);
       const notes=($('#f-notes').value||'').trim().split(/\s+/).filter(Boolean).slice(0,25).join(' ');
       const fields={ name, variety:$('#f-var').value, colour:$('#f-colour').value, style:$('#f-style').value, organic:$('#f-organic').value==='Y', region:$('#f-region').value, subRegion:$('#f-sub').value.trim(), notes, pairings:pairs, awards:($('#f-awards').value||'').trim(), vintage:+$('#f-vin').value||2024, price:+$('#f-price').value||0, qty:+$('#f-qty').value||0 };
       if(isEdit){ const btn=$('#m-save'); btn.disabled=true; Promise.resolve(PStore.updateWine(edit.id, fields)).then(()=>{ WINES=PStore.wines; closeModal(); go('wines'); toast('Saved · '+name+' updated across AIWine'); }).catch(e=>{ btn.disabled=false; toast('Couldn’t save: '+(e&&e.message||e)); }); }
