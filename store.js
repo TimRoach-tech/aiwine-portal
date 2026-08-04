@@ -57,6 +57,7 @@
         freeThreshold: w.free_threshold ?? 6, minOrder: w.min_order ?? 1,
         mixed: w.mixed_cases ?? true, paused: !!w.paused, pausedUntil: w.paused_until || '',
         dozenOn: !!w.dozen_on, dozenRate: (w.dozen_rate ?? 10),
+        tiers: w.tiers || [],
         allocOn: !!w.alloc_on, allocCap: w.alloc_cap ?? 6, allocWines: w.alloc_wines || [],
         pickup: w.local_pickup ?? true, giftMsg: !!w.gift_message, giftWrap: !!w.gift_wrap,
       };
@@ -70,6 +71,7 @@
           free_threshold: s.freeThreshold, min_order: s.minOrder, mixed_cases: s.mixed,
           paused: s.paused, paused_until: s.pausedUntil || null, dozen_on: s.dozenOn,
           dozen_rate: s.dozenRate, alloc_on: s.allocOn, alloc_cap: s.allocCap,
+          tiers: s.tiers || [],
           alloc_wines: s.allocWines, local_pickup: s.pickup, gift_message: s.giftMsg, gift_wrap: s.giftWrap,
         }).eq('id', wineryId).select('id'));
         if (!error && (!data || !data.length)) throw new Error('You are not linked to this winery in the database (no winery_users row for your login) — settings can\u2019t be saved. Ask an admin to link your account.');
@@ -80,6 +82,7 @@
         free_threshold: s.freeThreshold, min_order: s.minOrder, mixed_cases: s.mixed,
         paused: s.paused, paused_until: s.pausedUntil || null, dozen_on: s.dozenOn,
         dozen_rate: s.dozenRate, alloc_on: s.allocOn, alloc_cap: s.allocCap,
+        tiers: s.tiers || [],
         alloc_wines: s.allocWines, local_pickup: s.pickup, gift_message: s.giftMsg, gift_wrap: s.giftWrap,
         fulfilment: s.fulfil || w.fulfilment,
       });
