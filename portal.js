@@ -267,7 +267,7 @@
     const steps = [
       { done: termsAccepted(), label:'Agree to the Winery Terms & Conditions', go:'upload', cta:'Review & agree' },
       { done: WINES.length>0, label:'Upload your wine range', go:'upload', cta:'Upload list' },
-      { done: WINES.some(w=>w.img||w.image), label:'Add bottle / label images', go:'images', cta:'Add images' },
+      { done: WINES.some(w=>w.img||w.image), label:'Add wine images', go:'images', cta:'Add wine images' },
       { done: !!(PStore&&PStore.ordersEmail), label:'Set fulfilment & order-notification email', go:'settings', cta:'Store settings' },
       { done: false, alwaysOpen:true, label:'Email bank account & GST number for payouts', go:'payments', cta:'How payouts work' },
     ];
@@ -1079,7 +1079,7 @@
       <div class="int-grid">
         ${intCard('upload','CSV / Excel upload','Available now','in','Upload a spreadsheet whenever your range changes. We match columns automatically and you confirm before publishing.','Go to upload','upload')}
         ${intCard('grid','Live dashboard','Available now','in','Edit prices and stock directly here — every change syncs to AIWine in seconds. No spreadsheets needed.','Manage wines','wines')}
-        ${intCard('bottle','Wine images','Available now','in','Drag in your bottle photos — each lands on the right wine by file name.','Add photos','images')}
+        ${intCard('bottle','Wine images','Available now','in','Add a photo to each wine — upload beside each wine in Wine images.','Add wine images','images')}
       </div>
       <div class="label" style="margin:26px 0 12px">On the roadmap</div>
       <div class="card card-pad roadmap">
@@ -1185,10 +1185,9 @@
     }
     function draw(){
       el.innerHTML = `
-        <div class="page-head"><div><div class="eyebrow">Bottle photos</div><h1 class="page-title">Wine <em>images</em>.</h1>
-        <div class="sub-line">One bottle photo per wine. Drag them all in at once — we match each photo to a wine by its file name.</div></div>
-        <div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap"><label style="display:inline-flex;align-items:center;gap:7px;font-size:12.5px;color:var(--ink-soft);cursor:pointer"><input type="checkbox" id="bgr-toggle" ${localStorage.getItem(BGR_KEY)!=='0'?'checked':''} style="width:16px;height:16px;accent-color:var(--claret)">Auto-remove background</label><button class="btn primary" id="pickall">${ic('upload',15)} Add photos</button></div></div>
-        <div class="drop" id="drop"><div class="dic">${ic('image',26)}</div><h3>Drop bottle photos here</h3><p>JPG or PNG. Name each file like the wine + vintage, e.g. <b>crimson-pinot-noir-2023.jpg</b> — it lands on the right wine automatically.</p></div>
+        <div class="page-head"><div><div class="eyebrow">Wine images</div><h1 class="page-title">Wine <em>images</em>.</h1>
+        <div class="sub-line">Add one photo per wine — use the Upload button beside each wine below.</div></div>
+        <label style="display:inline-flex;align-items:center;gap:7px;font-size:12.5px;color:var(--ink-soft);cursor:pointer"><input type="checkbox" id="bgr-toggle" ${localStorage.getItem(BGR_KEY)!=='0'?'checked':''} style="width:16px;height:16px;accent-color:var(--claret)">Auto-remove background</label></div>
         <div class="card card-pad" style="margin-top:12px;display:flex;gap:12px;align-items:flex-start"><span style="flex:none;color:var(--claret);margin-top:1px">${ic('image',18)}</span><div style="font-size:12.5px;color:var(--ink-soft);line-height:1.6"><b>How your photo is prepared.</b> Every photo is trimmed, sized and centred to match the others, so your range looks consistent. With <b>Auto-remove background</b> on (recommended), we lift the bottle off its background for you. If it’s off and your photo has a <b>solid white or coloured background</b>, that background will show as a box behind the bottle — for the cleanest result, upload a bottle already cut out on a transparent background, or leave Auto-remove background on.</div></div>
         <input type="file" id="fileall" accept="image/*" multiple hidden>
         <div class="card" style="margin-top:18px"><div class="tbl-wrap"><table class="tbl">
@@ -1202,13 +1201,6 @@
       el.querySelectorAll('[data-up]').forEach(b=>b.addEventListener('click',()=>{ target=b.dataset.up; single.click(); }));
       el.querySelectorAll('[data-rm]').forEach(b=>b.addEventListener('click',()=>{ if(LIVE){ PStore.removeWineImage(b.dataset.rm).then(()=>{ WINES=PStore.wines; draw(); toast('Photo removed'); }); } else { delete imgs[b.dataset.rm]; save(); draw(); } }));
       const bt=el.querySelector('#bgr-toggle'); if(bt) bt.addEventListener('change',()=>{ try{ localStorage.setItem(BGR_KEY, bt.checked?'1':'0'); }catch(e){} });
-      const fa=el.querySelector('#fileall');
-      el.querySelector('#pickall').addEventListener('click',()=>fa.click());
-      fa.addEventListener('change',e=>handleFiles(e.target.files));
-      const drop=el.querySelector('#drop');
-      ['dragenter','dragover'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add('over');}));
-      ['dragleave','drop'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove('over');}));
-      drop.addEventListener('drop',e=>{ e.preventDefault(); handleFiles(e.dataTransfer.files); });
     }
     draw();
   };
