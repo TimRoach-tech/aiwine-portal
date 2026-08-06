@@ -87,6 +87,36 @@
         fulfilment: s.fulfil || w.fulfilment,
       });
     },
+    // Apply the given settings object to EVERY winery this login manages (used by
+    // the "Apply to all my wineries" scope on the Store settings page). Writes each
+    // winery's row directly; returns { ok, fail:[names] }.
+    async applySettingsToAll(s) {
+      const fail = [];
+      for (const wy of wineries) {
+        try {
+          let { data, error } = await sb.rpc('set_store_settings', { p_winery: wy.id, p_settings: s });
+          if (error && /(function|does not exist|PGRST202|schema cache|not_authoris|not_authoriz)/i.test(error.message)) {
+            ({ data, error } = await sb.from('wineries').update({
+              free_threshold: s.freeThreshold, min_order: s.minOrder, mixed_cases: s.mixed,
+              paused: s.paused, paused_until: s.pausedUntil || null, dozen_on: s.dozenOn,
+              dozen_rate: s.dozenRate, alloc_on: s.allocOn, alloc_cap: s.allocCap,
+              tiers: s.tiers || [], alloc_wines: s.allocWines, local_pickup: s.pickup,
+              gift_message: s.giftMsg, gift_wrap: s.giftWrap, fulfilment: s.fulfil || wy.fulfilment,
+            }).eq('id', wy.id).select('id'));
+            if (!error && (!data || !data.length)) throw new Error('not linked');
+          }
+          if (error) throw new Error(error.message);
+          Object.assign(wy, {
+            free_threshold: s.freeThreshold, min_order: s.minOrder, mixed_cases: s.mixed,
+            paused: s.paused, paused_until: s.pausedUntil || null, dozen_on: s.dozenOn,
+            dozen_rate: s.dozenRate, alloc_on: s.allocOn, alloc_cap: s.allocCap,
+            tiers: s.tiers || [], alloc_wines: s.allocWines, local_pickup: s.pickup,
+            gift_message: s.giftMsg, gift_wrap: s.giftWrap, fulfilment: s.fulfil || wy.fulfilment,
+          });
+        } catch (e) { fail.push(wy.name); }
+      }
+      return { ok: fail.length === 0, fail };
+    },
     get planCellarDoor() { const w = wineries.find(x => x.id === wineryId); return !!(w && w.cellarDoorActive); },
     get planGrow() { const w = wineries.find(x => x.id === wineryId); return !!(w && w.growActive); },
     // Virtual Cellar Door editable content (story / hours / hero photo URL).

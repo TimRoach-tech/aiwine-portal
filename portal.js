@@ -1066,7 +1066,7 @@
 
       <div class="save-bar">
         <span class="note">${ic('check',14,'var(--green)')} Changes save as you go and sync to the shop, the app &amp; your cellar-door listing.</span>
-        <div style="display:flex;gap:10px"><button class="btn ghost" id="set-reset">Reset</button><button class="btn primary" id="set-save">Save settings</button></div>
+        <div style="display:flex;gap:10px;align-items:center">${(PStore.wineries||[]).length>1?`<button class="btn ghost" id="set-apply-all" title="Copy these settings to every winery you manage">Apply to all my wineries (${PStore.wineries.length})</button>`:''}<button class="btn ghost" id="set-reset">Reset</button><button class="btn primary" id="set-save">Save settings</button></div>
       </div>`;
 
     const persist = async (toastMsg) => {
@@ -1089,6 +1089,18 @@
     el.querySelectorAll('[data-tier-pct]').forEach(inp=>inp.addEventListener('change',()=>{ s.tiers[+inp.dataset.tierPct].pct=+inp.value||0; persist('Saved'); }));
     el.querySelectorAll('[data-tier-btls]').forEach(inp=>inp.addEventListener('change',()=>{ s.tiers[+inp.dataset.tierBtls].btls=Math.max(24,+inp.value||24); persist('Saved'); }));
     el.querySelector('#set-save').addEventListener('click',()=>persist('Settings saved'));
+    const applyAll=el.querySelector('#set-apply-all');
+    if(applyAll) applyAll.addEventListener('click',async()=>{
+      const n=(PStore.wineries||[]).length;
+      if(!confirm('Apply these store settings to ALL '+n+' wineries you manage?\n\nThis overwrites each winery\u2019s current store settings with the ones shown here.')) return;
+      saveSet(s); applyAll.disabled=true; const orig=applyAll.textContent; applyAll.textContent='Applying\u2026';
+      if(PStore.mode==='live'){
+        try{ const r=await PStore.applySettingsToAll(Object.assign({},s,{fulfil:s.fulfil}));
+          toast(r.ok?('Applied to all '+n+' wineries \u2713'):('Applied \u2014 but failed for: '+r.fail.join(', ')));
+        }catch(e){ toast('Apply-all failed: '+((e&&e.message)||e)); }
+      } else toast('Applied to all (demo)');
+      applyAll.disabled=false; applyAll.textContent=orig;
+    });
     el.querySelector('#set-reset').addEventListener('click',()=>{ if(confirm('Reset store settings to defaults?')){ el._set=Object.assign({},SET_DEFAULTS); saveSet(el._set); rerender(); toast('Reset to defaults'); } });
     bindGo(el);
   };
