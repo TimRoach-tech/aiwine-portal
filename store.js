@@ -182,6 +182,17 @@
         p_contact: p.contact || null, p_message: p.message || null, p_country: p.country || 'NZ',
       });
       if (error) throw new Error(error.message);
+      // Fire-and-forget: email the admin that a request is waiting (never blocks
+      // the winery, never throws — approval flow is unaffected if this fails).
+      if (data === 'pending') {
+        try {
+          fetch('/api/notify-signup', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ wineryName: p.name, email: p.email || null, region: p.region || null,
+              website: p.website || null, contact: p.contact || null, message: p.message || null }),
+          }).catch(() => {});
+        } catch (e) {}
+      }
       return data;   // 'pending' | 'linked'
     },
     // the signed-in user's own request (RLS returns only their row), or null
