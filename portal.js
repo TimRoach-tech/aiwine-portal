@@ -14,6 +14,9 @@
     image:'<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 16l5-5 4 4 3-3 6 6"/><circle cx="8.5" cy="9.5" r="1.5"/>',
     scan:'<path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2M7 12h10"/>',
     sparkle:'<path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/>',
+    chat:'<path d="M21 11.5a8.4 8.4 0 0 1-9 8.4 9 9 0 0 1-4-1L3 20l1.1-4A8.4 8.4 0 0 1 12 3a8.4 8.4 0 0 1 9 8.5z"/>',
+    send:'<path d="M22 2 11 13M22 2l-7 20-4-9-9-4z"/>',
+    refresh:'<path d="M3 12a9 9 0 0 1 15-6.7L21 8M21 3v5h-5M21 12a9 9 0 0 1-15 6.7L3 16M3 21v-5h5"/>',
     heart:'<path d="M20.8 5.6a5 5 0 0 0-7 0L12 7.3l-1.8-1.7a5 5 0 0 0-7 7L12 21l8.8-8.4a5 5 0 0 0 0-7z"/>',
     map:'<path d="M9 3 3 5v16l6-2 6 2 6-2V3l-6 2-6-2zM9 3v16M15 5v16"/>',
     passport:'<path d="M4 4a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2zM9 7h6M12 11a2 2 0 1 0 0-.01zM8 18h8"/>',
@@ -137,6 +140,8 @@
     { id:'insights', label:'Insights', icon:'chart' },
     { id:'integrations', label:'Integrations', icon:'plug' },
     { id:'app', label:'Winery app', icon:'sparkle' },
+    { sec:'Help' },
+    { id:'help', label:'Ask Vine', icon:'chat', action:'help' },
   ];
 
   function shell(){
@@ -166,7 +171,7 @@
         </div>
         <nav class="nav" id="nav">
           ${NAV.map(n=> n.sec ? `<div class="nav-sec">${n.sec}</div>` :
-            `<button class="nav-link" data-go="${n.id}">
+            `<button class="nav-link"${n.action?` data-action="${n.action}"`:` data-go="${n.id}"`}>
               <span class="ic">${ic(n.icon,17)}</span>${n.label}
               ${n.badge?`<span class="badge" data-badge="${n.id}"></span>`:''}
             </button>`).join('')}
@@ -201,9 +206,26 @@
       </div>
       <div class="scrim" id="scrim"></div>
       <div class="modal" id="modal"></div>
-      <div id="toast"></div>`;
+      <div id="toast"></div>
+      <button class="help-fab" id="help-fab" aria-label="Get help from Vine, the AIWine assistant" aria-expanded="false"><span class="ic">${ic('chat',20)}</span><span class="lbl">Help</span></button>
+      <div class="help-panel" id="help-panel" role="dialog" aria-label="AIWine help assistant">
+        <div class="help-head">
+          <div class="h-av">${ic('sparkle',20)}</div>
+          <div class="h-tt"><div class="h-nm">Vine</div><div class="h-sub"><span class="dot"></span>AI help · always on</div></div>
+          <button class="h-btn" id="help-reset" title="Start over" aria-label="Reset conversation">${ic('refresh',16)}</button>
+          <button class="h-btn" id="help-close" title="Close" aria-label="Close help">${ic('x',18)}</button>
+        </div>
+        <div class="help-body" id="help-body"></div>
+        <div class="help-foot">
+          <form class="help-form" id="help-form">
+            <textarea id="help-input" rows="1" placeholder="Ask about onboarding, uploads, orders…" aria-label="Ask Vine a question"></textarea>
+            <button class="help-send" type="submit" id="help-send" aria-label="Send message">${ic('send',17)}</button>
+          </form>
+          <div class="help-note">Vine guides you through the portal · <button type="button" id="help-reset2">Reset chat</button></div>
+        </div>
+      </div>`;
 
-    $('#nav').addEventListener('click', e=>{ const b=e.target.closest('[data-go]'); if(b) go(b.dataset.go); });
+    $('#nav').addEventListener('click', e=>{ const b=e.target.closest('[data-go],[data-action]'); if(!b) return; if(b.dataset.action==='help'){ $('#side').classList.remove('open'); $('#scrim').classList.remove('open'); openHelp(); } else if(b.dataset.go){ go(b.dataset.go); } });
     $('#menu').addEventListener('click', ()=>{ const s=$('#side'); s.classList.toggle('open'); $('#scrim').classList.toggle('open', s.classList.contains('open')||$('#modal').classList.contains('open')); });
     $('#scrim').addEventListener('click', ()=>{ closeModal(); $('#side').classList.remove('open'); $('#scrim').classList.remove('open'); });
     const so=$('#signout'); if(so) so.addEventListener('click', async e=>{ e.preventDefault(); await PStore.signOut(); renderLogin(); });
@@ -222,6 +244,86 @@
     }
     const aw=$('#add-winery'); if(aw) aw.addEventListener('click', e=>{ e.preventDefault(); addWineryModal(); });
     updateBadges();
+    helpWidget();
+  }
+
+  // ---------- AI help assistant ("Vine") ----------
+  const HELP_ENDPOINT = '/api/help-chat';
+  const helpKey = ()=> 'aiwine-portal:help-chat:'+((PStore&&PStore.wineryId)||'demo');
+  function loadHelp(){ try{ return JSON.parse(localStorage.getItem(helpKey()))||[]; }catch(e){ return []; } }
+  function saveHelp(msgs){ try{ localStorage.setItem(helpKey(), JSON.stringify(msgs.slice(-40))); }catch(e){} }
+  const HELP_SUGGEST = [
+    'How do I get my wines live on AIWine?',
+    'How do I upload my wine list?',
+    'What\u2019s the fulfilment profile — which should I choose?',
+    'How do orders and payments work?'
+  ];
+  // markdown-lite → safe HTML: paragraphs, - bullets, **bold**, auto-linked emails/URLs.
+  function fmtHelp(text){
+    const linkify = s => s
+      .replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" target="_blank" rel="noopener">$1</a>')
+      .replace(/([A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,})/gi, '<a href="mailto:$1">$1</a>')
+      .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+    const lines = esc(String(text||'')).split(/\n/);
+    let html='', list=[];
+    const flush=()=>{ if(list.length){ html+='<ul>'+list.map(li=>'<li>'+linkify(li)+'</li>').join('')+'</ul>'; list=[]; } };
+    lines.forEach(raw=>{
+      const line=raw.trim();
+      if(/^[-\u2022]\s+/.test(line)) list.push(line.replace(/^[-\u2022]\s+/,''));
+      else { flush(); if(line) html+='<p>'+linkify(line)+'</p>'; }
+    });
+    flush();
+    return html || '<p>'+linkify(esc(String(text||'')))+'</p>';
+  }
+  let _helpMsgs=[], _helpBusy=false;
+  function helpScreenLabel(){ const n=NAV.find(x=>x.id===route); return n&&n.label ? n.label : (route||'the portal'); }
+  function renderHelpBody(){
+    const body=$('#help-body'); if(!body) return;
+    if(!_helpMsgs.length){
+      const nm = (PStore&&PStore.wineryName) ? esc(PStore.wineryName.split(' ')[0]) : 'there';
+      body.innerHTML = `<div class="h-msg a h-intro"><p>Kia ora — I’m <strong>Vine</strong>, your AIWine assistant. Ask me anything about running your store, from first sign-up through to managing your wines.</p><div class="h-chips">`+
+        HELP_SUGGEST.map(s=>`<button class="h-chip" data-q="${esc(s)}"><span class="ic">${ic('sparkle',15)}</span>${esc(s)}</button>`).join('')+`</div></div>`;
+      body.querySelectorAll('.h-chip').forEach(c=>c.addEventListener('click',()=>sendHelp(c.dataset.q)));
+    } else {
+      body.innerHTML = _helpMsgs.map(m=>`<div class="h-msg ${m.role==='user'?'u':'a'}">${m.role==='user'?('<p>'+esc(m.content).replace(/\n/g,'<br>')+'</p>'):fmtHelp(m.content)}</div>`).join('');
+    }
+    if(_helpBusy) body.insertAdjacentHTML('beforeend','<div class="h-typing" id="h-typing"><span></span><span></span><span></span></div>');
+    body.scrollTop = body.scrollHeight;
+  }
+  async function sendHelp(text){
+    text=String(text||'').trim(); if(!text||_helpBusy) return;
+    _helpMsgs.push({ role:'user', content:text }); saveHelp(_helpMsgs);
+    _helpBusy=true; renderHelpBody();
+    const ta=$('#help-input'); if(ta){ ta.value=''; ta.style.height='auto'; }
+    const context={ screen:helpScreenLabel(), wineryName:PStore&&PStore.wineryName, region:PStore&&PStore.wineryRegion, mode:PStore&&PStore.mode, plan:(hasGrow&&hasGrow()?'Grow':(hasCellar&&hasCellar()?'Virtual Cellar Door':'Free listing')) };
+    let reply='';
+    try {
+      const res=await fetch(HELP_ENDPOINT,{ method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ messages:_helpMsgs.map(m=>({role:m.role,content:m.content})), context }) });
+      const data=await res.json().catch(()=>({}));
+      reply = data.reply || (res.ok ? '' : '');
+      if(!reply) reply = 'Sorry — I couldn’t reach the assistant just then. Please try again, or email partners@aiwine.co.nz and we’ll help you directly.';
+    } catch(e){
+      reply = 'I couldn’t connect just now. If this keeps happening, email partners@aiwine.co.nz and we’ll help you directly.';
+    }
+    _helpBusy=false;
+    _helpMsgs.push({ role:'assistant', content:reply }); saveHelp(_helpMsgs);
+    renderHelpBody();
+  }
+  function openHelp(){ const p=$('#help-panel'), f=$('#help-fab'); if(!p) return; p.classList.add('open'); f.classList.add('hide'); f.setAttribute('aria-expanded','true'); setTimeout(()=>{ const ta=$('#help-input'); if(ta&&window.innerWidth>600) ta.focus(); },220); }
+  function closeHelp(){ const p=$('#help-panel'), f=$('#help-fab'); if(!p) return; p.classList.remove('open'); f.classList.remove('hide'); f.setAttribute('aria-expanded','false'); }
+  function resetHelp(){ confirmModal({ title:'Reset this conversation?', message:'This clears your chat history with Vine on this device. This can\u2019t be undone.', confirm:'Reset', danger:true }, ()=>{ _helpMsgs=[]; try{ localStorage.removeItem(helpKey()); }catch(e){} renderHelpBody(); toast('Conversation reset'); const ta=$('#help-input'); if(ta) ta.focus(); }); }
+  function helpWidget(){
+    _helpMsgs = loadHelp(); _helpBusy=false;
+    renderHelpBody();
+    $('#help-fab').addEventListener('click', openHelp);
+    $('#help-close').addEventListener('click', closeHelp);
+    $('#help-reset').addEventListener('click', resetHelp);
+    $('#help-reset2').addEventListener('click', resetHelp);
+    const ta=$('#help-input');
+    ta.addEventListener('input',()=>{ ta.style.height='auto'; ta.style.height=Math.min(ta.scrollHeight,120)+'px'; });
+    ta.addEventListener('keydown',e=>{ if(e.key==='Enter'&&!e.shiftKey){ e.preventDefault(); sendHelp(ta.value); } });
+    $('#help-form').addEventListener('submit',e=>{ e.preventDefault(); sendHelp(ta.value); });
+    document.addEventListener('keydown',e=>{ if(e.key==='Escape'&&$('#help-panel')&&$('#help-panel').classList.contains('open')) closeHelp(); });
   }
 
   function updateBadges(){

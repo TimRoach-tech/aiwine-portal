@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>AIWine Portal — Store Settings (preview)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500;1,600&family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="portal.css" />
+<style>
+  /* preview-only helpers (would move into portal.css when wired) */
+  body{background:var(--bone)}
+  .wrap{max-width:1180px;margin:0 auto;padding:30px 34px 70px}
+  .set-group{margin-bottom:26px}
+  .set-group > .gh{display:flex;align-items:center;gap:10px;margin:0 0 12px}
+  .set-group > .gh .eyebrow{margin:0}
+  .set-group > .gh .gl{height:1px;background:var(--line);flex:1}
+  .set-card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:0;overflow:hidden}
+  .set-row{display:flex;align-items:flex-start;gap:20px;padding:18px 22px;border-bottom:1px solid var(--line-soft)}
+  .set-row:last-child{border-bottom:none}
+  .set-row .info{flex:1;min-width:0}
+  .set-row .info h3{font-family:var(--serif);font-weight:600;font-size:18px;line-height:1.15;display:flex;align-items:center;gap:9px}
+  .set-row .info p{font-size:12.8px;color:var(--ink-soft);line-height:1.5;margin-top:4px;max-width:60ch}
+  .set-row .info .funded{font-family:var(--mono);font-size:9px;letter-spacing:.1em;text-transform:uppercase;padding:2px 8px;border-radius:999px;background:color-mix(in oklab,var(--green),var(--bone) 84%);color:var(--green)}
+  .set-row .info .funded.win{background:color-mix(in oklab,var(--claret),var(--bone) 86%);color:var(--claret)}
+  .set-ctl{flex-shrink:0;display:flex;flex-direction:column;align-items:flex-end;gap:9px;min-width:200px}
+  /* toggle */
+  .sw{position:relative;width:46px;height:26px;flex-shrink:0}
+  .sw input{opacity:0;width:0;height:0;position:absolute}
+  .sw .tr{position:absolute;inset:0;background:var(--line);border-radius:999px;transition:background .2s}
+  .sw .tr::before{content:"";position:absolute;left:3px;top:3px;width:20px;height:20px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.25);transition:transform .2s}
+  .sw input:checked + .tr{background:var(--green)}
+  .sw input:checked + .tr::before{transform:translateX(20px)}
+  .sub-ctl{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--ink-soft)}
+  .sub-ctl select,.sub-ctl input{padding:7px 10px;border:1px solid var(--line);border-radius:7px;background:var(--card-2);font-family:var(--mono);font-size:12.5px;color:var(--ink)}
+  .sub-ctl.dim{opacity:.4;pointer-events:none}
+  .tiers{display:flex;flex-direction:column;gap:7px;width:100%}
+  .tier{display:flex;align-items:center;gap:8px;justify-content:flex-end;font-size:12.5px}
+  .tier .x{color:var(--muted);cursor:pointer}
+  .save-bar{position:sticky;bottom:0;margin-top:24px;background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:14px 20px;display:flex;align-items:center;justify-content:space-between;box-shadow:0 -8px 24px -18px rgba(27,20,16,.4)}
+  .save-bar .note{font-size:12.5px;color:var(--muted);display:flex;align-items:center;gap:8px}
+  .prevtag{position:fixed;top:12px;right:14px;z-index:50;font-family:var(--mono);font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--amber);background:color-mix(in oklab,var(--amber),var(--bone) 84%);border:1px solid color-mix(in oklab,var(--amber),var(--bone) 64%);padding:5px 11px;border-radius:999px}
+  @media(max-width:760px){.set-row{flex-direction:column;gap:14px}.set-ctl{align-items:flex-start;min-width:0;width:100%}}
+</style>
+</head>
+<body>
+<div class="prevtag">Preview · not yet wired</div>
+<div class="wrap">
+
+  <div class="page-head">
+    <div>
+      <div class="eyebrow">Your winery</div>
+      <h1 class="page-title">Store <em>settings</em>.</h1>
+      <div class="sub-line">How your wines sell on AIWine. Each setting syncs to the shop, the app and your cellar-door listing.</div>
+    </div>
+    <div class="seg"><button class="on">The Three Chimneys</button><button>All my wineries</button></div>
+  </div>
+
+  <!-- SELLING & CASES -->
+  <div class="set-group">
+    <div class="gh"><span class="eyebrow">Selling &amp; cases</span><span class="gl"></span></div>
+    <div class="set-card">
+
+      <div class="set-row">
+        <div class="info">
+          <h3>How you ship · fulfilment profile</h3>
+          <p>Any quantity lets customers buy 1+ bottles ($12 delivery under six). Sixes &amp; twelves only means your wines always ship as complete cartons — the AI sommelier helps the customer fill the case.</p>
+        </div>
+        <div class="set-ctl">
+          <div class="seg"><button class="on">Any quantity</button><button>6s &amp; 12s only</button></div>
+        </div>
+      </div>
+
+      <div class="set-row">
+        <div class="info">
+          <h3>Discovery Dozen discount <span class="funded win">Winery-funded</span></h3>
+          <p>Reward a full case of 12 with a discount off the wine. Free delivery on 12 applies either way — this adds a % saving on top. <b>Off by default</b>; turn it on and choose the rate.</p>
+        </div>
+        <div class="set-ctl">
+          <label class="sw"><input type="checkbox" checked /><span class="tr"></span></label>
+          <div class="sub-ctl">Rate <select><option>10%</option><option>12.5%</option><option>15%</option><option>20%</option></select></div>
+        </div>
+      </div>
+
+      <div class="set-row">
+        <div class="info">
+          <h3>Free-delivery threshold</h3>
+          <p>Where your winery-funded free delivery kicks in. Most choose six (the Discovery Six); pick twelve if you'd rather only cover freight on a full case.</p>
+        </div>
+        <div class="set-ctl">
+          <div class="seg"><button class="on">6 bottles</button><button>12 bottles</button></div>
+        </div>
+      </div>
+
+      <div class="set-row">
+        <div class="info">
+          <h3>Volume tiers <span class="funded win">Winery-funded</span></h3>
+          <p>Optional deeper case deals for bigger orders — e.g. 10% at a dozen, 15% at two. Leave empty to keep it simple.</p>
+        </div>
+        <div class="set-ctl">
+          <div class="tiers">
+            <div class="tier">10% at <input style="width:52px;padding:6px 8px;border:1px solid var(--line);border-radius:6px;font-family:var(--mono)" value="12" /> btls <span class="x">✕</span></div>
+            <div class="tier">15% at <input style="width:52px;padding:6px 8px;border:1px solid var(--line);border-radius:6px;font-family:var(--mono)" value="24" /> btls <span class="x">✕</span></div>
+            <button class="btn sm ghost" style="align-self:flex-end">+ Add tier</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="set-row">
+        <div class="info">
+          <h3>Minimum order</h3>
+          <p>Fewest bottles a customer must buy from your winery before checkout. Set to 1 for no minimum.</p>
+        </div>
+        <div class="set-ctl">
+          <div class="stepper"><button>−</button><input value="1" /><button>+</button></div>
+        </div>
+      </div>
+
+      <div class="set-row">
+        <div class="info">
+          <h3>Mixed cases</h3>
+          <p>Allow customers to mix your different wines into one case. Turn off if a case must be a single wine.</p>
+        </div>
+        <div class="set-ctl">
+          <label class="sw"><input type="checkbox" checked /><span class="tr"></span></label>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- AVAILABILITY -->
+  <div class="set-group">
+    <div class="gh"><span class="eyebrow">Availability</span><span class="gl"></span></div>
+    <div class="set-card">
+
+      <div class="set-row">
+        <div class="info">
+          <h3>Pause selling · holiday mode</h3>
+          <p>Temporarily stop taking orders — over vintage, a break, or a stock-out — without unpublishing your wines. They reappear the moment you switch it back on.</p>
+        </div>
+        <div class="set-ctl">
+          <label class="sw"><input type="checkbox" /><span class="tr"></span></label>
+          <div class="sub-ctl dim">Until <input type="date" value="2026-08-15" /></div>
+        </div>
+      </div>
+
+      <div class="set-row">
+        <div class="info">
+          <h3>Per-wine allocation cap</h3>
+          <p>Limit how many bottles of a scarce wine one customer can buy per order. Applies to wines you flag as allocated.</p>
+        </div>
+        <div class="set-ctl">
+          <div class="stepper"><button>−</button><input value="6" /><button>+</button></div>
+        </div>
+      </div>
+
+      <div class="set-row">
+        <div class="info">
+          <h3>Local pickup · cellar-door collection</h3>
+          <p>Offer a $0 "collect in person" option at checkout for locals — no freight, straight from your cellar door.</p>
+        </div>
+        <div class="set-ctl">
+          <label class="sw"><input type="checkbox" checked /><span class="tr"></span></label>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- PRESENTATION -->
+  <div class="set-group">
+    <div class="gh"><span class="eyebrow">Presentation &amp; extras</span><span class="gl"></span></div>
+    <div class="set-card">
+
+      <div class="set-row">
+        <div class="info">
+          <h3>Gift options</h3>
+          <p>Let customers add a gift message (and gift wrap, if you offer it) to orders from your winery.</p>
+        </div>
+        <div class="set-ctl">
+          <label class="sw"><input type="checkbox" /><span class="tr"></span></label>
+        </div>
+      </div>
+
+      <div class="set-row">
+        <div class="info">
+          <h3>Featured wines</h3>
+          <p>Choose up to three hero wines to lead your storefront and cellar-door listing.</p>
+        </div>
+        <div class="set-ctl">
+          <button class="btn sm">Choose wines →</button>
+        </div>
+      </div>
+
+      <div class="set-row">
+        <div class="info">
+          <h3>AIWine subscriber discount <span class="funded">AIWine-funded</span></h3>
+          <p>App subscribers get an extra 10% — funded by AIWine, never a cost to you. Shown here so you can see every discount a customer might receive.</p>
+        </div>
+        <div class="set-ctl">
+          <span class="pill in">Always on · AIWine</span>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="save-bar">
+    <span class="note">✓ Changes save instantly and sync to the shop, app &amp; cellar-door listing.</span>
+    <div style="display:flex;gap:10px"><button class="btn ghost">Reset</button><button class="btn primary">Save settings</button></div>
+  </div>
+
+</div>
+</body>
+</html>
