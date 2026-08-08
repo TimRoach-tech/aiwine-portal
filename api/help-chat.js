@@ -128,7 +128,7 @@ module.exports = async (req, res) => {
     }
 
     const data = await resp.json();
-    const reply = (data.content && data.content[0] && data.content[0].text || '').trim();
+    const reply = ((data.content || []).filter(b => b && b.type === 'text').map(b => b.text).join('\n')).trim();
     return res.status(200).json({ reply: reply || 'Sorry — I didn’t catch that. Could you rephrase?' });
   } catch (e) {
     return res.status(500).json({ error: String(e.message || e), reply: 'Something went wrong on my end. Please try again in a moment.' });
