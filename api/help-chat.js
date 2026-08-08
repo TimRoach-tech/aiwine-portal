@@ -13,7 +13,7 @@
 //   ANTHROPIC_API_KEY
 // ---------------------------------------------------------------------------
 
-const MODEL = 'claude-3-5-haiku-latest';   // the model this account has access to; upgrade once Sonnet is enabled in the Anthropic console
+const MODEL = 'claude-sonnet-5';   // smarter guidance for the help assistant; portal help volume is low
 const MAX_TOKENS = 700;
 const MAX_TURNS = 16;                       // last N messages kept as context
 

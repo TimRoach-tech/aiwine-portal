@@ -22,7 +22,7 @@
 //   GENERATE_WHY_SECRET                        (shared secret to gate the endpoint)
 // ---------------------------------------------------------------------------
 
-const MODEL = 'claude-3-5-haiku-latest';   // small, cheap, plenty for a one-liner
+const MODEL = 'claude-haiku-4-5-20251001';   // small, cheap, plenty for a one-liner
 const BATCH = 40;                          // wines per invocation (stay within limits)
 const MAX_WORDS = 18;
 
