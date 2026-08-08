@@ -13,7 +13,7 @@
 //   ANTHROPIC_API_KEY
 // ---------------------------------------------------------------------------
 
-const MODEL = 'claude-sonnet-4-20250514';   // smarter guidance; portal help volume is low
+const MODEL = 'claude-3-5-sonnet-latest';   // smarter than Haiku, available on all keys; portal help volume is low
 const MAX_TOKENS = 700;
 const MAX_TURNS = 16;                       // last N messages kept as context
 
