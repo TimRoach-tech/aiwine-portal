@@ -1,0 +1,15 @@
+{
+  "name": "AIWine Winery Portal",
+  "short_name": "AIWine Portal",
+  "description": "Manage your winery, wines and orders on AIWine.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#F4EFE5",
+  "theme_color": "#5C1B27",
+  "icons": [
+    { "src": "app-icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "app-icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "app-icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
