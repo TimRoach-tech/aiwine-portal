@@ -58,7 +58,7 @@
   PLAN=Object.assign({ cellarDoor:false, grow:false, story:'', hours:'', activatedVia:'' }, PLAN);
   function savePlan(){ try{ localStorage.setItem(PLAN_KEY, JSON.stringify(PLAN)); }catch(e){} }
   // ---------- winery T&C acceptance (gates the first upload) ----------
-  const TERMS_VERSION='1.1';
+  const TERMS_VERSION='1.2';
   const termsKey=()=> 'aiwine-portal:terms:'+(PStore&&PStore.wineryId?PStore.wineryId:'demo');
   function termsAccepted(){ try{ const r=JSON.parse(localStorage.getItem(termsKey())); return !!(r&&r.version===TERMS_VERSION); }catch(e){ return false; } }
   function acceptTerms(){ try{ localStorage.setItem(termsKey(), JSON.stringify({ version:TERMS_VERSION, at:new Date().toISOString(), by:(PStore&&PStore.userEmail)||'' })); }catch(e){} }
