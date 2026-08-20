@@ -113,11 +113,14 @@
             tiers: s.tiers || [], alloc_wines: s.allocWines, local_pickup: s.pickup,
             gift_message: s.giftMsg, gift_wrap: s.giftWrap, fulfilment: s.fulfil || wy.fulfilment,
           });
-        } catch (e) { fail.push(wy.name); }
+        } catch (e) { fail.push(wy.name); if (window.AIWineReport) AIWineReport.error('settings_apply_all_failed', e, { winery: wy.name }); }
       }
       return { ok: fail.length === 0, fail };
     },
     get planCellarDoor() { const w = wineries.find(x => x.id === wineryId); return !!(w && w.cellarDoorActive); },
+    // Current Supabase access token — needed by the serverless endpoints that
+    // verify the caller (notify-signup, report-error). Empty in demo mode.
+    accessToken() { try { return (session && session.access_token) || ''; } catch (e) { return ''; } },
     get planGrow() { const w = wineries.find(x => x.id === wineryId); return !!(w && w.growActive); },
     // Virtual Cellar Door editable content (story / hours / hero photo URL).
     get cellarInfo() {
@@ -216,8 +219,11 @@
       // the winery, never throws — approval flow is unaffected if this fails).
       if (data === 'pending') {
         try {
+          const headers = { 'Content-Type': 'application/json' };
+          const t = (session && session.access_token) || '';
+          if (t) headers.Authorization = 'Bearer ' + t;
           fetch('/api/notify-signup', {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            method: 'POST', headers,
             body: JSON.stringify({ wineryName: p.name, email: p.email || null, region: p.region || null,
               website: p.website || null, contact: p.contact || null, message: p.message || null }),
           }).catch(() => {});
@@ -289,7 +295,7 @@
         db.updated_at = new Date().toISOString();
         if (w) { w.updatedBy = db.updated_by; w.updatedAt = db.updated_at; }
         const { error } = await sb.from('wines').update(db).eq('id', id);
-        if (error) throw new Error(error.message);
+        if (error) { if (window.AIWineReport) AIWineReport.error('wine_save_failed', error, { wineId: id }); throw new Error(error.message); }
       }
     },
     async addWine(w) {
@@ -322,7 +328,7 @@
       const ext = (file.type && file.type.split('/')[1] || 'jpg').replace('jpeg', 'jpg');
       const path = `${wineryId}/${id}.${ext}`;
       const up = await sb.storage.from('wine-images').upload(path, file, { upsert: true, contentType: file.type || 'image/jpeg' });
-      if (up.error) throw new Error(up.error.message);
+      if (up.error) { if (window.AIWineReport) AIWineReport.error('image_upload_failed', up.error, { wineId: id, path }); throw new Error(up.error.message); }
       const { data } = sb.storage.from('wine-images').getPublicUrl(path);
       const url = data.publicUrl + '?t=' + Date.now();   // cache-bust on replace
       await Store.updateWine(id, { image_url: url });

@@ -13,13 +13,51 @@
 const esc = (s) => String(s == null ? '' : s)
   .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
+// throttle state (best-effort, per warm instance)
+const SENDS = new Map();
+const DAY = { start: Date.now(), n: 0 };
+
 module.exports = async (req, res) => {
-  // CORS (portal calls this from the browser)
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  // CORS: only our own surfaces may trigger a staff email. An open endpoint here
+  // is an email-flood / Resend-quota vector, and it buries the very alert channel
+  // staff rely on (audit Medium finding).
+  const allowed = (process.env.SIGNUP_NOTIFY_ORIGINS ||
+    'https://portal.aiwine.co.nz,https://www.aiwine.co.nz,https://aiwine.co.nz')
+    .split(',').map((s) => s.trim()).filter(Boolean);
+  const origin = req.headers.origin || '';
+  if (allowed.includes(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Vary', 'Origin');
+  }
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   if (req.method === 'OPTIONS') return res.status(204).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'POST only' });
+  if (origin && !allowed.includes(origin)) return res.status(403).json({ error: 'origin_not_allowed' });
+
+  // Require a signed-in caller: the winery always has a session at this point,
+  // so an unauthenticated POST is never legitimate.
+  const sbUrl = process.env.SUPABASE_URL, sbKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const authz = req.headers.authorization || '';
+  const token = authz.startsWith('Bearer ') ? authz.slice(7) : '';
+  if (sbUrl && sbKey) {
+    if (!token) return res.status(401).json({ error: 'sign_in_required' });
+    try {
+      const who = await fetch(`${sbUrl.replace(/\/+$/, '')}/auth/v1/user`, {
+        headers: { apikey: sbKey, Authorization: `Bearer ${token}` },
+      });
+      if (!who.ok) return res.status(401).json({ error: 'bad_session' });
+    } catch (e) { return res.status(401).json({ error: 'session_check_failed' }); }
+  }
+
+  // Per-IP throttle + a daily cap, so a loop can't drain the Resend quota.
+  const ip = (req.headers['x-forwarded-for'] || '').split(',')[0].trim() || 'unknown';
+  const now = Date.now();
+  const rec = SENDS.get(ip);
+  if (!rec || now - rec.start > 60_000) SENDS.set(ip, { start: now, n: 1 });
+  else if (++rec.n > 5) return res.status(429).json({ error: 'too_many_requests' });
+  if (now - DAY.start > 86_400_000) { DAY.start = now; DAY.n = 0; }
+  if (++DAY.n > 200) return res.status(429).json({ error: 'daily_cap' });
 
   try {
     let b = req.body;
