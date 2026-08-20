@@ -54,21 +54,29 @@ function reprice(input) {
     if (!w) return { ok: false, error: `unknown_wine:${ln.id}` };
     if (qty < 1) continue;
     if ((w.stock || 0) < qty) return { ok: false, error: `insufficient_stock:${ln.id}`, available: w.stock || 0 };
-    clean.push({ id: ln.id, qty, price: w.price, winery: w.winery, name: w.name, region: w.region || '' });
+    clean.push({ id: ln.id, qty, price: w.price, winery: w.winery, wineryId: w.wineryId || null, name: w.name, region: w.region || '' });
   }
   if (!clean.length) return { ok: false, error: 'empty_cart' };
 
-  const settingsOf = (key) => Object.assign(
-    { freeThreshold: M.halfCase, minOrder: 1, mixed: true, paused: false, dozenOn: false, dozenRate: M.fullCaseDisc * 100 },
-    settings[key] || {}
+  const DEFAULT_SETTINGS = { freeThreshold: M.halfCase, minOrder: 1, mixed: true, paused: false, dozenOn: false, dozenRate: M.fullCaseDisc * 100 };
+  // Resolve settings by wineryId FIRST (stable), falling back to the winery name
+  // for rows not yet carrying an id. Name matching is case/space-insensitive so a
+  // rename or duplicate row can no longer silently drop a winery to defaults
+  // (which quietly changed postage, discount and the commission base).
+  const normName = (s) => String(s == null ? '' : s).trim().toLowerCase().replace(/\s+/g, ' ');
+  const byNorm = {};
+  for (const k of Object.keys(settings)) byNorm[normName(k)] = settings[k];
+  const settingsOf = (key, wineryId) => Object.assign(
+    {}, DEFAULT_SETTINGS,
+    (wineryId != null && settings[wineryId]) || byNorm[normName(key)] || {}
   );
-  const keyOf = (winery) => groups[winery] || winery;
+  const keyOf = (it) => groups[it.winery] || it.wineryId || it.winery;
 
   // 2) Group into shipments (brands that ship together pool bottles).
   const byKey = {};
   for (const it of clean) {
-    const key = keyOf(it.winery);
-    (byKey[key] = byKey[key] || { key, region: it.region, bottles: 0, subtotal: 0, items: [] });
+    const key = keyOf(it);
+    (byKey[key] = byKey[key] || { key, label: it.winery, wineryId: it.wineryId || null, region: it.region, bottles: 0, subtotal: 0, items: [] });
     byKey[key].bottles += it.qty;
     byKey[key].subtotal += it.price * it.qty;
     byKey[key].items.push(it);
@@ -81,7 +89,7 @@ function reprice(input) {
   const promoPct = Number(input.promoPct) > 0 ? Math.min(Number(input.promoPct), 0.5) : 0;
   let anyPaused = false;
   const shipments = Object.values(byKey).map((g) => {
-    const st = settingsOf(g.key);
+    const st = settingsOf(g.label || g.key, g.wineryId);
     if (st.paused) anyPaused = true;
     const dozen = g.bottles >= M.fullCase && st.dozenOn;
     const discPct = dozen ? (st.dozenRate != null ? st.dozenRate / 100 : M.fullCaseDisc) : 0;
@@ -95,7 +103,7 @@ function reprice(input) {
     const commissionGst = r2(commission * M.gstRate);
     const belowMin = g.bottles < (st.minOrder || 1);
     return {
-      winery: g.key, region: g.region, bottles: g.bottles,
+      winery: g.label || g.key, wineryId: g.wineryId || null, region: g.region, bottles: g.bottles,
       subtotal: g.subtotal, discount, appDiscount, promoDiscount, postage, wineValue, total,
       commission, commissionGst,
       belowMin,

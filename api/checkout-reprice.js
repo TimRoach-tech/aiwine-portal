@@ -33,39 +33,51 @@ module.exports.config = { api: { bodyParser: true } };
 
 async function fetchWines(sbUrl, sbKey, ids) {
   // service-role read: live price + stock for exactly the requested ids.
+  // NOTE: `wines` has no `winery` text column — the winery NAME comes from the
+  // embedded wineries relation via wines."wineryId" (the same FK the RLS policy
+  // in migration 01 uses). Selecting a bare `winery` column would 400.
   const inList = ids.map((id) => `"${String(id).replace(/[^\w-]/g, '')}"`).join(',');
-  const url = `${sbUrl.replace(/\/+$/, '')}/rest/v1/wines?id=in.(${inList})&select=id,name,winery,region,price,stock,published`;
+  const url = `${sbUrl.replace(/\/+$/, '')}/rest/v1/wines?id=in.(${inList})&select=id,name,"wineryId",region,price,stock,published,wineries(id,name)`;
   const r = await fetch(url, { headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}` } });
   if (!r.ok) throw new Error('wines_fetch_failed:' + r.status);
   const rows = await r.json();
   const map = {};
   for (const w of rows) {
     if (w.published === false) continue;          // never sell an unpublished wine
-    map[w.id] = { price: Number(w.price), stock: Number(w.stock), winery: w.winery, name: w.name, region: w.region };
+    const wy = w.wineries || {};
+    map[w.id] = {
+      price: Number(w.price), stock: Number(w.stock),
+      wineryId: w.wineryId || wy.id || null,
+      winery: wy.name || '',                      // display/grouping label only
+      name: w.name, region: w.region,
+    };
   }
   return map;
 }
 
-async function fetchSettings(sbUrl, sbKey, names) {
+async function fetchSettings(sbUrl, sbKey, wineryIds) {
   // per-winery store settings that affect price (free threshold, dozen discount, pause, min).
-  // Scoped to ONLY the wineries in this cart: an unbounded select silently hits
-  // PostgREST's default row cap as the directory grows, which would drop some
-  // wineries' settings and fall back to defaults (a hidden mispricing).
-  const base = `${sbUrl.replace(/\/+$/, '')}/rest/v1/wineries?select=name,free_threshold,min_order,mixed_cases,paused,dozen_on,dozen_rate&limit=500`;
+  // Scoped to the winery IDS in this cart. An unbounded select silently hits
+  // PostgREST's default row cap as the directory grows, dropping some wineries'
+  // settings to defaults (a hidden mispricing). Keyed by BOTH id and name so
+  // _pricing.js can resolve on the stable id and fall back to the name.
+  const base = `${sbUrl.replace(/\/+$/, '')}/rest/v1/wineries?select=id,name,free_threshold,min_order,mixed_cases,paused,dozen_on,dozen_rate&limit=500`;
   let url = base;
-  if (Array.isArray(names) && names.length) {
-    const inList = names.map((n) => `"${String(n).replace(/"/g, '')}"`).join(',');
-    url = `${base}&name=in.(${encodeURIComponent(inList).replace(/%2C/g, ',')})`;
+  if (Array.isArray(wineryIds) && wineryIds.length) {
+    const inList = wineryIds.map((id) => `"${String(id).replace(/"/g, '')}"`).join(',');
+    url = `${base}&id=in.(${inList})`;
   }
   const r = await fetch(url, { headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}` } });
   if (!r.ok) return {};
   const rows = await r.json();
   const map = {};
   for (const w of rows) {
-    map[w.name] = {
+    const s = {
       freeThreshold: w.free_threshold, minOrder: w.min_order, mixed: w.mixed_cases,
       paused: w.paused, dozenOn: w.dozen_on, dozenRate: w.dozen_rate,
     };
+    if (w.id != null) map[w.id] = s;
+    if (w.name) map[w.name] = s;
   }
   return map;
 }
@@ -129,9 +141,10 @@ module.exports = async function handler(req, res) {
   let wines, settings;
   try {
     wines = await fetchWines(sbUrl, sbKey, ids);
-    // settings are keyed by winery name, so scope the fetch to this cart's wineries
-    const names = [...new Set(Object.values(wines).map((w) => w.winery).filter(Boolean))];
-    settings = await fetchSettings(sbUrl, sbKey, names);
+    // Settings are fetched for the winery IDS in this cart (the stable key), and
+    // the map is keyed by both id and name so _pricing.js can resolve either way.
+    const wineryIds = [...new Set(Object.values(wines).map((w) => w.wineryId).filter(Boolean))];
+    settings = await fetchSettings(sbUrl, sbKey, wineryIds);
   } catch (e) {
     res.status(502).json({ error: 'db_error', detail: String(e.message || e) }); return;
   }
