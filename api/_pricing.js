@@ -1,7 +1,7 @@
 /* AIWine — server-side re-pricing (pure, no I/O).
    ------------------------------------------------------------------
    THE PRICE AUTHORITY for the live cart. Mirrors the client math in
-   site-*/assets/app.js (shipments / gstContent / buildOrder) but runs on the
+   site-final/assets/app.js (shipments / gstContent / buildOrder) but runs on the
    server from DB-sourced prices, so a tampered browser total is never trusted.
 
    ⚠ CONTRACT: if you change the cart math in app.js (thresholds, discounts,
@@ -34,7 +34,8 @@ const r2 = (n) => Math.round(n * 100) / 100;
  * @param {Object<string,string>} [input.groups]   brand -> group display name (ship-together pools)
  * @param {Object<string,{freeThreshold?:number,minOrder?:number,mixed?:boolean,paused?:boolean,dozenOn?:boolean,dozenRate?:number}>} [input.settings]
  *        per-winery/group store settings (from the wineries table)
- * @param {boolean} [input.member]                 paid app member
+ * @param {boolean} [input.member]                 paid app member (SERVER-VERIFIED ONLY)
+ * @param {number}  [input.promoPct]               validated promo fraction, e.g. 0.10 (SERVER-DERIVED ONLY)
  * @param {Object} [input.market]                  market overrides (gstRate, etc)
  * @returns {{ok:boolean, error?:string, order?:Object}}
  */
@@ -74,6 +75,10 @@ function reprice(input) {
   }
 
   // 3) Per-shipment discounts, postage, commission.
+  // promoPct is a SERVER-derived value (validated against promo_codes by the
+  // caller) — never a number the browser supplied. Stacks after the case
+  // discount and the member discount, mirroring app.js.
+  const promoPct = Number(input.promoPct) > 0 ? Math.min(Number(input.promoPct), 0.5) : 0;
   let anyPaused = false;
   const shipments = Object.values(byKey).map((g) => {
     const st = settingsOf(g.key);
@@ -82,15 +87,16 @@ function reprice(input) {
     const discPct = dozen ? (st.dozenRate != null ? st.dozenRate / 100 : M.fullCaseDisc) : 0;
     const discount = r0(g.subtotal * discPct);
     const appDiscount = member ? r0((g.subtotal - discount) * M.appMemberDisc) : 0;
+    const promoDiscount = promoPct ? r0((g.subtotal - discount - appDiscount) * promoPct) : 0;
     const postage = g.bottles >= st.freeThreshold ? 0 : M.postagePerShipment;
-    const wineValue = g.subtotal - discount - appDiscount;   // what the customer pays for wine
+    const wineValue = g.subtotal - discount - appDiscount - promoDiscount;   // what the customer pays for wine
     const total = wineValue + postage;
     const commission = r2(wineValue * M.commissionRate);
     const commissionGst = r2(commission * M.gstRate);
     const belowMin = g.bottles < (st.minOrder || 1);
     return {
       winery: g.key, region: g.region, bottles: g.bottles,
-      subtotal: g.subtotal, discount, appDiscount, postage, wineValue, total,
+      subtotal: g.subtotal, discount, appDiscount, promoDiscount, postage, wineValue, total,
       commission, commissionGst,
       belowMin,
       items: g.items.map((i) => ({ id: i.id, qty: i.qty, price: i.price })),
@@ -117,6 +123,7 @@ function reprice(input) {
       postage: sum((s) => s.postage),
       discount: sum((s) => s.discount),
       appDiscount: sum((s) => s.appDiscount),
+      promoDiscount: sum((s) => s.promoDiscount),
       total: grandTotal,
       amountCents: Math.round(grandTotal * 100),   // what Stripe should charge
       gst,

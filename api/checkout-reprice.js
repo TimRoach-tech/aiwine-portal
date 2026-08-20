@@ -3,12 +3,20 @@
    portal repo at /api/checkout-reprice.
 
    WHY: the browser must NEVER decide what to charge. The client posts only the
-   cart lines (wine id + qty) + delivery method + gifts + member flag. This
-   endpoint fetches LIVE price + stock from Supabase, recomputes the whole order
-   (grouping, discounts, postage, GST) and the AIWine commission server-side via
-   _pricing.js, and returns the authoritative amount. The Stripe Checkout Session
-   is then created from THAT amount — the client total is only cross-checked, never
-   trusted.
+   cart lines (wine id + qty) + delivery method + gifts, plus its Supabase access
+   token and (optionally) a promo CODE. This endpoint fetches LIVE price + stock
+   from Supabase, VERIFIES the caller's identity and membership, VALIDATES the
+   promo code itself, recomputes the whole order (grouping, discounts, postage,
+   GST) and the AIWine commission server-side via _pricing.js, and returns the
+   authoritative amount. The Stripe Checkout Session is then created from THAT
+   amount — the client total is only cross-checked, never trusted.
+
+   TRUST RULES (audit findings C2/C3):
+     • membership   — read from profiles.member for the VERIFIED user id.
+                      A `member` field in the request body is IGNORED.
+     • promo codes  — the client may send only `promoCode`; the percentage and
+                      expiry come from validate_promo / promo_codes server-side.
+                      A `promoPct` in the request body is IGNORED.
 
    Env (Vercel → portal project):
      SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
@@ -38,9 +46,17 @@ async function fetchWines(sbUrl, sbKey, ids) {
   return map;
 }
 
-async function fetchSettings(sbUrl, sbKey) {
+async function fetchSettings(sbUrl, sbKey, names) {
   // per-winery store settings that affect price (free threshold, dozen discount, pause, min).
-  const url = `${sbUrl.replace(/\/+$/, '')}/rest/v1/wineries?select=name,free_threshold,min_order,mixed_cases,paused,dozen_on,dozen_rate`;
+  // Scoped to ONLY the wineries in this cart: an unbounded select silently hits
+  // PostgREST's default row cap as the directory grows, which would drop some
+  // wineries' settings and fall back to defaults (a hidden mispricing).
+  const base = `${sbUrl.replace(/\/+$/, '')}/rest/v1/wineries?select=name,free_threshold,min_order,mixed_cases,paused,dozen_on,dozen_rate&limit=500`;
+  let url = base;
+  if (Array.isArray(names) && names.length) {
+    const inList = names.map((n) => `"${String(n).replace(/"/g, '')}"`).join(',');
+    url = `${base}&name=in.(${encodeURIComponent(inList).replace(/%2C/g, ',')})`;
+  }
   const r = await fetch(url, { headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}` } });
   if (!r.ok) return {};
   const rows = await r.json();
@@ -57,7 +73,7 @@ async function fetchSettings(sbUrl, sbKey) {
 module.exports = async function handler(req, res) {
   const origin = process.env.CHECKOUT_ALLOW_ORIGIN || '';
   if (origin) { res.setHeader('Access-Control-Allow-Origin', origin); res.setHeader('Vary', 'Origin'); }
-  if (req.method === 'OPTIONS') { res.setHeader('Access-Control-Allow-Methods', 'POST'); res.setHeader('Access-Control-Allow-Headers', 'Content-Type'); res.status(204).end(); return; }
+  if (req.method === 'OPTIONS') { res.setHeader('Access-Control-Allow-Methods', 'POST'); res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization'); res.status(204).end(); return; }
   if (req.method !== 'POST') { res.status(405).json({ error: 'method' }); return; }
 
   const sbUrl = process.env.SUPABASE_URL, sbKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -68,12 +84,54 @@ module.exports = async function handler(req, res) {
   if (!lines.length) { res.status(400).json({ error: 'empty_cart' }); return; }
   const ids = [...new Set(lines.map((l) => l.id))];
 
+  // --- Identity: verify the caller's token; NEVER trust body.member ---------
+  // No token (guest) simply means "not a member" — checkout still works.
+  let userId = null, member = false;
+  const auth = req.headers.authorization || '';
+  const token = auth.startsWith('Bearer ') ? auth.slice(7) : '';
+  if (token) {
+    try {
+      const who = await fetch(`${sbUrl.replace(/\/+$/, '')}/auth/v1/user`, {
+        headers: { apikey: sbKey, Authorization: `Bearer ${token}` },
+      });
+      if (who.ok) {
+        const u = await who.json();
+        userId = (u && u.id) || null;
+        if (userId) {
+          const pr = await fetch(`${sbUrl.replace(/\/+$/, '')}/rest/v1/profiles?id=eq.${encodeURIComponent(userId)}&select=member`, {
+            headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}` },
+          });
+          if (pr.ok) { const rows = await pr.json(); member = !!(rows && rows[0] && rows[0].member); }
+        }
+      }
+    } catch (e) { userId = null; member = false; }
+  }
+
+  // --- Promo: the client sends a CODE ONLY; we derive the percentage ---------
+  let promoPct = 0, promoCode = null, promoRejected = null;
+  const rawCode = typeof body.promoCode === 'string' ? body.promoCode.trim().toUpperCase().slice(0, 40) : '';
+  if (rawCode) {
+    if (!member) {
+      promoRejected = 'members_only';
+    } else {
+      try {
+        const pc = await fetch(`${sbUrl.replace(/\/+$/, '')}/rest/v1/promo_codes?code=eq.${encodeURIComponent(rawCode)}&select=code,pct,expires_at,active`, {
+          headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}` },
+        });
+        const row = pc.ok ? (await pc.json())[0] : null;
+        if (!row || row.active === false) promoRejected = 'unknown_code';
+        else if (row.expires_at && new Date(row.expires_at) < new Date()) promoRejected = 'expired';
+        else { promoPct = Math.max(0, Math.min(Number(row.pct) / 100, 0.5)); promoCode = row.code; }
+      } catch (e) { promoRejected = 'lookup_failed'; }
+    }
+  }
+
   let wines, settings;
   try {
-    [wines, settings] = await Promise.all([
-      fetchWines(sbUrl, sbKey, ids),
-      fetchSettings(sbUrl, sbKey),
-    ]);
+    wines = await fetchWines(sbUrl, sbKey, ids);
+    // settings are keyed by winery name, so scope the fetch to this cart's wineries
+    const names = [...new Set(Object.values(wines).map((w) => w.winery).filter(Boolean))];
+    settings = await fetchSettings(sbUrl, sbKey, names);
   } catch (e) {
     res.status(502).json({ error: 'db_error', detail: String(e.message || e) }); return;
   }
@@ -83,7 +141,8 @@ module.exports = async function handler(req, res) {
     wines,
     settings,
     groups: body.groups || {},          // brand->group map (from site config; move to DB at go-live)
-    member: !!body.member,
+    member,                             // server-verified, NOT body.member
+    promoPct,                           // server-derived, NOT body.promoPct
     market: body.market || {},
   });
   if (!result.ok) { res.status(409).json(result); return; }   // stock/min/paused problem → client re-syncs
@@ -112,6 +171,9 @@ module.exports = async function handler(req, res) {
   res.status(200).json({
     ok: true,
     order,                    // authoritative amount, per-shipment commission snapshot
+    member,                   // what the SERVER decided (client should re-render from this)
+    promo: promoCode ? { code: promoCode, pct: promoPct } : null,
+    promoRejected,            // 'members_only' | 'unknown_code' | 'expired' | 'lookup_failed' | null
     clientMismatch: mismatch, // true if the browser's number disagreed (log/alert)
     // checkoutUrl: session.url,   // ← uncomment with the Stripe block above
   });
