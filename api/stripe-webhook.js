@@ -99,6 +99,75 @@ module.exports = async function handler(req, res) {
 
   const wineryId = s.client_reference_id || null;
   const plink = s.payment_link || '';
+
+  // ---- WINE ORDER (go-live path) -------------------------------------------
+  // A wine checkout is identified by metadata.kind === 'wine_order' set when the
+  // session is created (checkout-reprice.js). The authoritative order object is
+  // the one the SERVER priced — never anything the browser sent. Everything
+  // (order rows per winery, line items, commission snapshot, stock decrement)
+  // lands in ONE transaction via record_paid_order; if any part fails the whole
+  // thing rolls back and we return 500 so Stripe re-delivers. This sits INSIDE
+  // the claim above, so a retry after success is ignored.
+  const meta = s.metadata || {};
+  if (meta.kind === 'wine_order') {
+    let orderObj = null;
+    try { orderObj = meta.order ? JSON.parse(meta.order) : null; } catch (e) { orderObj = null; }
+    if (!orderObj && meta.repriceRef) {
+      // Order too large for Stripe metadata (500-char values): it was parked in
+      // priced_orders at session creation. Fetch the priced snapshot by ref.
+      try {
+        const pr = await sb(`priced_orders?ref=eq.${encodeURIComponent(meta.repriceRef)}&select=order,customer,method,gifts,promo_code,user_id`);
+        if (pr.ok) {
+          const rows = await pr.json();
+          if (rows && rows[0]) {
+            orderObj = rows[0].order;
+            meta.customer = JSON.stringify(rows[0].customer || {});
+            meta.method = rows[0].method || 'deliver';
+            meta.gifts = rows[0].gifts ? JSON.stringify(rows[0].gifts) : null;
+            meta.promoCode = rows[0].promo_code || null;
+            meta.userId = rows[0].user_id || null;
+          }
+        }
+      } catch (e) { /* handled below */ }
+    }
+    if (!orderObj) {
+      console.error('stripe-webhook: wine order with no priced snapshot', s.id);
+      if (event.id) await finish(event.id, 'failed');
+      res.status(500).json({ error: 'missing_priced_order' }); return;   // Stripe retries
+    }
+
+    const parseJson = (v) => { try { return v ? JSON.parse(v) : null; } catch (e) { return null; } };
+    const rpc = await sbRpc('record_paid_order', {
+      p_payment_ref: s.id,
+      p_order: orderObj,
+      p_customer: parseJson(meta.customer) || {
+        name: (s.customer_details && s.customer_details.name) || null,
+        email: (s.customer_details && s.customer_details.email) || s.customer_email || null,
+      },
+      p_method: meta.method || 'deliver',
+      p_gifts: parseJson(meta.gifts),
+      p_promo_code: meta.promoCode || null,
+      p_user: meta.userId || null,
+    });
+    if (!rpc.ok) {
+      const detail = await rpc.text();
+      console.error('stripe-webhook: record_paid_order failed', rpc.status, detail);
+      // 'oversold:<wineId>' means stock went between re-price and payment. The
+      // customer HAS paid, so this must be visible for a refund/partial decision
+      // rather than silently swallowed.
+      const oversold = /oversold:/.test(detail);
+      if (event.id) await finish(event.id, oversold ? 'oversold' : 'failed', { session_id: s.id });
+      res.status(oversold ? 200 : 500).json({ error: oversold ? 'oversold_needs_staff' : 'order_write_failed' });
+      return;
+    }
+    const orderIds = await rpc.json();
+    if (event.id) await finish(event.id, 'processed', { session_id: s.id });
+    console.log('stripe-webhook: recorded order(s)', orderIds, 'for session', s.id);
+    res.status(200).json({ received: true, orders: orderIds });
+    return;
+  }
+
+  // ---- SUBSCRIPTION / PLAN ACTIVATION (existing path) ----------------------
   let feature = null;
   if (plink && plink === process.env.STRIPE_PLINK_CELLAR_DOOR) feature = 'cellarDoor';
   else if (plink && plink === process.env.STRIPE_PLINK_GROW) feature = 'grow';
