@@ -52,11 +52,50 @@ module.exports = async function handler(req, res) {
   let event;
   try { event = JSON.parse(raw); } catch (e) { res.status(400).json({ error: 'bad_json' }); return; }
 
+  const sb = (path, init) => fetch(`${sbUrl.replace(/\/+$/, '')}/rest/v1/${path}`, Object.assign({
+    headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}`, 'Content-Type': 'application/json' },
+  }, init || {}));
+  const sbRpc = (fn, args) => fetch(`${sbUrl.replace(/\/+$/, '')}/rest/v1/rpc/${fn}`, {
+    method: 'POST',
+    headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify(args),
+  });
+  const finish = (id, status, extra) => sb(`stripe_events?id=eq.${encodeURIComponent(id)}`, {
+    method: 'PATCH',
+    headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+    body: JSON.stringify(Object.assign({ status, completed_at: new Date().toISOString() }, extra || {})),
+  }).catch(() => {});
+
   // Only completed checkouts flip features on. Everything else: acknowledge.
   if (event.type !== 'checkout.session.completed') { res.status(200).json({ received: true }); return; }
 
   const s = event.data && event.data.object ? event.data.object : {};
   if (s.payment_status && s.payment_status !== 'paid') { res.status(200).json({ received: true, note: 'not_paid' }); return; }
+
+  // ---- IDEMPOTENCY: claim the event id BEFORE any side effect. -------------
+  // Stripe retries on every 5xx (and this handler returns 500 on a DB failure),
+  // so retries are designed behaviour, not an edge case. Only the caller that
+  // wins the insert proceeds; a retry exits here having changed nothing. This
+  // guard must stay in front of the order write + stock decrement added at go-live.
+  if (event.id) {
+    try {
+      const claim = await sbRpc('claim_stripe_event', {
+        p_id: event.id, p_type: event.type, p_session: s.id || null, p_payload: null,
+      });
+      if (claim.ok) {
+        const won = await claim.json();
+        if (won === false) { res.status(200).json({ received: true, note: 'duplicate_ignored' }); return; }
+      } else if (claim.status !== 404) {
+        // 404 = claim_stripe_event not installed yet (migration 24 not run):
+        // fall through so today's boolean flip still works. Any other error is real.
+        console.error('stripe-webhook: claim failed', claim.status, await claim.text());
+        res.status(500).json({ error: 'claim_failed' }); return;
+      }
+    } catch (e) {
+      console.error('stripe-webhook: claim error', e && e.message);
+      res.status(500).json({ error: 'claim_error' }); return;
+    }
+  }
 
   const wineryId = s.client_reference_id || null;
   const plink = s.payment_link || '';
@@ -65,9 +104,12 @@ module.exports = async function handler(req, res) {
   else if (plink && plink === process.env.STRIPE_PLINK_GROW) feature = 'grow';
 
   if (!wineryId || !feature) {
-    // Can't match automatically — Stripe's own email covers manual follow-up.
+    // Can't match automatically. RECORD it — a paid session that silently
+    // returns 200 relies on a human noticing Stripe's email, and a winery that
+    // has paid may never be activated (audit High finding).
     console.warn('stripe-webhook: unmatched session', { wineryId, plink, session: s.id });
-    res.status(200).json({ received: true, note: 'unmatched — activate manually' });
+    if (event.id) await finish(event.id, 'unmatched', { winery_id: wineryId || null });
+    res.status(200).json({ received: true, note: 'unmatched — recorded for staff follow-up' });
     return;
   }
 
@@ -87,8 +129,10 @@ module.exports = async function handler(req, res) {
   });
   if (!r.ok) {
     console.error('stripe-webhook: supabase update failed', r.status, await r.text());
+    if (event.id) await finish(event.id, 'failed');
     res.status(500).json({ error: 'db_update_failed' }); return;   // Stripe will retry
   }
+  if (event.id) await finish(event.id, 'processed', { winery_id: wineryId });
   console.log('stripe-webhook: activated', feature, 'for winery', wineryId);
   res.status(200).json({ received: true, activated: feature, wineryId });
 };

@@ -50,6 +50,7 @@ async function fetchWines(sbUrl, sbKey, ids) {
       wineryId: w.wineryId || wy.id || null,
       winery: wy.name || '',                      // display/grouping label only
       name: w.name, region: w.region,
+      published: w.published !== false,           // carried through for the hard block
     };
   }
   return map;

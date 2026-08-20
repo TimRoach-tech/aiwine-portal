@@ -46,15 +46,26 @@ function reprice(input) {
   const settings = input.settings || {};
   const member = !!input.member;
 
-  // 1) Validate every line against the DB: exists + enough stock.
+  // 1) Validate every line against the DB: exists + sellable + enough stock.
+  //    HARD BLOCK (audit Medium): a line is only sellable if it came from a LIVE
+  //    published database row with a real price. During soft launch the site
+  //    merges the demo catalogue alongside live wines (MERGE_DEMO), and demo
+  //    entries carry placeholder prices (demoPrice). If one ever became buyable
+  //    that is a sale at an invented price. The merge order is not allowed to be
+  //    the only thing preventing it — the server refuses here, always.
   const clean = [];
   for (const ln of (input.lines || [])) {
     const w = wines[ln.id];
     const qty = Math.max(0, parseInt(ln.qty, 10) || 0);
     if (!w) return { ok: false, error: `unknown_wine:${ln.id}` };
     if (qty < 1) continue;
+    if (w.demoPrice === true || w.demo === true) return { ok: false, error: `not_for_sale:${ln.id}` };
+    if (w.published === false) return { ok: false, error: `not_published:${ln.id}` };
+    const price = Number(w.price);
+    if (!Number.isFinite(price) || price <= 0) return { ok: false, error: `no_price:${ln.id}` };
+    if (!w.wineryId && !w.winery) return { ok: false, error: `no_winery:${ln.id}` };
     if ((w.stock || 0) < qty) return { ok: false, error: `insufficient_stock:${ln.id}`, available: w.stock || 0 };
-    clean.push({ id: ln.id, qty, price: w.price, winery: w.winery, wineryId: w.wineryId || null, name: w.name, region: w.region || '' });
+    clean.push({ id: ln.id, qty, price, winery: w.winery, wineryId: w.wineryId || null, name: w.name, region: w.region || '' });
   }
   if (!clean.length) return { ok: false, error: 'empty_cart' };
 
