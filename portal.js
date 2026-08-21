@@ -62,7 +62,7 @@
   const termsKey=()=> 'aiwine-portal:terms:'+(PStore&&PStore.wineryId?PStore.wineryId:'demo');
   function termsAccepted(){ try{ const r=JSON.parse(localStorage.getItem(termsKey())); return !!(r&&r.version===TERMS_VERSION); }catch(e){ return false; } }
   function acceptTerms(){ try{ localStorage.setItem(termsKey(), JSON.stringify({ version:TERMS_VERSION, at:new Date().toISOString(), by:(PStore&&PStore.userEmail)||'' })); }catch(e){} }
-  const CODES={ 'FOUNDING49':{price:49,label:'Founding'}, 'WAIRARAPA':{price:0,label:'Wairarapa Association'}, 'WAIRARAPA26':{price:0,label:'Wairarapa founding 2026'} };
+  const CODES={ 'FOUNDING26':{price:0,label:'Founding member 2026'}, 'FOUNDING49':{price:49,label:'Founding'}, 'WAIRARAPA':{price:0,label:'Wairarapa Association'}, 'WAIRARAPA26':{price:0,label:'Wairarapa founding 2026'} };
   const hasCellar=()=> PStore.mode==='live' ? PStore.planCellarDoor : PLAN.cellarDoor;
   const hasGrow  =()=> PStore.mode==='live' ? PStore.planGrow : PLAN.grow;
   function activate(via, price){ PLAN.cellarDoor=true; PLAN.activatedVia=via; savePlan(); go('plan'); toast(price?('Virtual Cellar Door active \u00b7 $'+price+'/yr'):'Virtual Cellar Door active \u00b7 free'); }
@@ -203,6 +203,7 @@
           <div id="screen-integrations" class="screen"></div>
           <div id="screen-plan" class="screen"></div>
           <div id="screen-app" class="screen"></div>
+          <div id="screen-about" class="screen"></div>
         </div>
       </div>
       <div class="scrim" id="scrim"></div>
@@ -1233,7 +1234,7 @@
       ${q('Is there a cost?',
         '<b>Uploading your wines and wine images is free.</b> There are no listing fees and no subscription required to sell.' +
         '<div style="margin-top:10px">AIWine takes a <b>20% commission (plus GST on that commission) only when we sell a wine for you</b>. If nothing sells, you pay nothing.</div>' +
-        '<div style="margin-top:10px">The optional <b>Virtual Cellar Door</b> is $95/yr, with a <b>$49 founding rate for your first year</b>. Wineries joining through a regional association may have an activation code that waives the first year entirely \u2014 enter it under <b>Plans &amp; Cellar Door</b>.</div>')}
+        '<div style="margin-top:12px;padding:12px 14px;background:#f6efe6;border-left:3px solid var(--claret);border-radius:0 8px 8px 0"><b>Founding members: your Virtual Cellar Door is free for the first 12 months.</b> Enter code <b>FOUNDING26</b> under Plans &amp; Cellar Door to activate it. It renews at $95/yr after the first year, and you can cancel any time.</div>')}
 
       ${q('Can I control how I sell my wine?',
         'Yes \u2014 you set the rules and the cart follows them everywhere on AIWine. In <b>Store settings</b> you control:' +
@@ -1249,7 +1250,7 @@
 
       ${q('How do I get paid?',
         '<b>Monthly payment.</b> The customer pays AIWine at checkout. We deduct our commission and pay the balance to your nominated bank account in the <b>first week of the following month</b>, with a sales statement and remittance advice for your records.' +
-        '<div style="margin-top:10px;padding:12px 14px;background:var(--bg-alt);border-radius:8px;font-size:13.5px"><b>Coming:</b> direct payment via Stripe Connect \u2014 funds released to your account within a couple of working days of each sale rather than monthly (Stripe fees apply). We\u2019ll let you know when it\u2019s available.</div>')}
+        '<div style="margin-top:12px;padding:12px 14px;background:#f6efe6;border-radius:8px;font-size:13.5px"><b>Coming — direct payment via Stripe Connect.</b> Funds released to your nominated account within a couple of working days of each sale, rather than monthly (Stripe fees apply). Not available yet — we’ll let you know the moment it is.</div>')}
 
       ${q('Why should I join?',
         li([
