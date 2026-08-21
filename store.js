@@ -7,6 +7,10 @@
 (function () {
   const CFG = window.PORTAL_CONFIG || {};
   const LIVE = !!(CFG.SUPABASE_URL && CFG.SUPABASE_ANON_KEY);
+  // Where the serverless endpoints live. Empty on the portal itself (same origin).
+  // The winery APP runs on its own subdomain, so it sets API_BASE in its config
+  // to point back at the portal — otherwise /api/* would 404 against the app host.
+  const API = (CFG.API_BASE || '').replace(/\/+$/, '');
 
   // ---------- demo seed (Ata Rangi, Martinborough) ----------
   const DEMO_WINES = [
@@ -20,8 +24,8 @@
   const DEMO_ORDERS = [
     { id:'AW-2041', placedAt:'25 min ago', destination:'Auckland', items:'6 × Crimson Pinot Noir', total:204, status:'new', gifts:{ 'Ata Rangi': { wrap:true, message:'Happy 40th Dad — enjoy every drop! Love the whanau x' } } },
     { id:'AW-2038', placedAt:'2 hours ago', destination:'Cellar-door pickup', items:'3 × Ata Rangi Pinot · 2 × Te Wā', total:373, status:'new', method:'pickup' },
-    { id:'AW-2034', placedAt:'Yesterday', destination:'Christchurch', items:'12 × Crimson Pinot Noir', total:346, status:'packing' },
-    { id:'AW-2029', placedAt:'2 days ago', destination:'Hamilton', items:'6 × Summer Rosé', total:163, status:'shipped' },
+    { id:'AW-2034', placedAt:'Yesterday', destination:'Christchurch', items:'12 × Crimson Pinot Noir', total:346, status:'packed', postage:0, tracking_number:'' },
+    { id:'AW-2029', placedAt:'2 days ago', destination:'Hamilton', items:'6 × Summer Rosé', total:163, status:'shipped', postage:12, tracking_number:'NZ4471288301', carrier:'NZ Post' },
     { id:'AW-2021', placedAt:'4 days ago', destination:'Nelson', items:'4 × Craighall Chardonnay', total:220, status:'shipped' },
   ];
 
@@ -222,7 +226,7 @@
           const headers = { 'Content-Type': 'application/json' };
           const t = (session && session.access_token) || '';
           if (t) headers.Authorization = 'Bearer ' + t;
-          fetch('/api/notify-signup', {
+          fetch(API + '/api/notify-signup', {
             method: 'POST', headers,
             body: JSON.stringify({ wineryName: p.name, email: p.email || null, region: p.region || null,
               website: p.website || null, contact: p.contact || null, message: p.message || null }),
@@ -341,8 +345,21 @@
       if (w) w.image = '';
     },
     async updateOrder(id, patch) {
-      const o = Store.orders.find(x => x.id === id); if (o) Object.assign(o, patch);
-      if (LIVE) await sb.from('orders').update(patch).eq('id', id);
+      const o = Store.orders.find(x => x.id === id);
+      if (!LIVE) { if (o) Object.assign(o, patch); return; }
+      // Only send real `orders` columns — a stray key fails the WHOLE PATCH, and
+      // PostgREST returns that as an error we used to swallow. Same defect class
+      // already fixed in updateWine.
+      const ALLOWED = ['status', 'tracking_number', 'carrier', 'shipped_at', 'fulfilled_at'];
+      const db = {};
+      for (const k of ALLOWED) if (patch[k] !== undefined) db[k] = patch[k];
+      if (!Object.keys(db).length) return;
+      // Write FIRST, then mutate memory. Doing it the other way round meant a
+      // rejected write still left the UI showing the advanced status — a winery
+      // would be told six orders shipped when nothing reached the database.
+      const { error } = await sb.from('orders').update(db).eq('id', id);
+      if (error) throw new Error(error.message);
+      if (o) Object.assign(o, patch);
     },
 
     // ---- bulk range publish (CSV / Excel upload → confirm) ----
@@ -385,7 +402,12 @@
   function normWine(r) { return { id: r.id, name: r.name, variety: r.variety, colour: r.colour, vintage: r.vintage, price: +r.price || 0, qty: +r.stock || +r.qty || 0, scans: +r.scans || 0, notes: r.notes || '', why: r.why || '', image: r.image_url || '', createdBy: r.created_by || '', createdAt: r.created_at || '', updatedBy: r.updated_by || '', updatedAt: r.updated_at || '' }; }
   function normOrder(r) {
     const items = (r.order_items || []).map(i => `${i.qty} × ${i.name}`).join(' · ');
-    return { id: r.id, placedAt: rel(r.placedAt), destination: r.destination, items, total: +r.total || 0, status: r.status, gifts: r.gifts || null, method: r.method || 'deliver' };
+    return { id: r.id, placedAt: rel(r.placedAt), destination: r.destination, items, total: +r.total || 0, status: r.status, gifts: r.gifts || null, method: r.method || 'deliver',
+      // fulfilment fields (migration 29) — the app's order sheet reads these, so
+      // dropping them made the tracking number write-only: it saved, then vanished.
+      tracking_number: r.tracking_number || '', carrier: r.carrier || '',
+      shipped_at: r.shipped_at || null, fulfilled_at: r.fulfilled_at || null,
+      postage: +r.postage || 0, commission: +r.commission || 0, wineryNet: +r.wineryNet || 0 };
   }
   function rel(ts) { if (!ts) return ''; const d = (Date.now() - new Date(ts)) / 86400000; return d < 1 ? 'today' : d < 2 ? 'yesterday' : Math.floor(d) + ' days ago'; }
 
