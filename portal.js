@@ -141,6 +141,7 @@
     { id:'integrations', label:'Integrations', icon:'plug' },
     { id:'app', label:'Winery app', icon:'sparkle' },
     { sec:'Help' },
+    { id:'about', label:'About AIWine', icon:'book' },
     { id:'help', label:'Ask Vine', icon:'chat', action:'help' },
   ];
 
@@ -1204,6 +1205,71 @@
       applyAll.disabled=false; applyAll.textContent=orig;
     });
     el.querySelector('#set-reset').addEventListener('click',()=>{ if(confirm('Reset store settings to defaults?')){ el._set=Object.assign({},SET_DEFAULTS); saveSet(el._set); rerender(); toast('Reset to defaults'); } });
+    bindGo(el);
+  };
+
+  RENDER.about = el => {
+    // Content is deliberately checked against what the portal + cart ACTUALLY do
+    // (fulfilment profiles, dozen discounts, published flag, store settings,
+    // 20% commission in _pricing.js, monthly payout in terms.html). Where a
+    // feature isn't live yet it is described as coming, not offered.
+    const q = (title, body) => `
+      <div class="card card-pad" style="margin-bottom:14px">
+        <div class="card-title" style="font-family:var(--serif);font-size:20px;margin-bottom:8px">${title}</div>
+        <div style="font-size:14px;color:var(--ink-soft);line-height:1.68">${body}</div>
+      </div>`;
+    const li = items => `<ul style="margin:10px 0 0;padding-left:20px">${items.map(i => `<li style="margin-bottom:7px">${i}</li>`).join('')}</ul>`;
+
+    el.innerHTML = `
+      <div class="page-head">
+        <div><div class="eyebrow">About</div>
+        <h1 class="page-title">About <em>AIWine</em>.</h1>
+        <div class="sub-line">What we do, what it costs, and how you stay in control of your wine.</div></div>
+      </div>
+
+      ${q('What is AIWine?',
+        'AIWine is a New Zealand wine discovery and online marketplace that uses AI to match people with wines they\u2019ll love, while giving wineries a simple virtual cellar door to sell directly to customers.')}
+
+      ${q('Is there a cost?',
+        '<b>Uploading your wines and wine images is free.</b> There are no listing fees and no subscription required to sell.' +
+        '<div style="margin-top:10px">AIWine takes a <b>20% commission (plus GST on that commission) only when we sell a wine for you</b>. If nothing sells, you pay nothing.</div>' +
+        '<div style="margin-top:10px">The optional <b>Virtual Cellar Door</b> is $95/yr, with a <b>$49 founding rate for your first year</b>. Wineries joining through a regional association may have an activation code that waives the first year entirely \u2014 enter it under <b>Plans &amp; Cellar Door</b>.</div>')}
+
+      ${q('Can I control how I sell my wine?',
+        'Yes \u2014 you set the rules and the cart follows them everywhere on AIWine. In <b>Store settings</b> you control:' +
+        li([
+          '<b>Single bottles, sixes or twelves</b> \u2014 choose whether you sell individual bottles or in cases only',
+          '<b>Case discounts</b> \u2014 set your own dozen discount rate, and volume tiers for larger orders',
+          '<b>Free delivery threshold</b> and minimum order size',
+          '<b>Which wines you offer</b> \u2014 publish or unpublish any wine at any time',
+          '<b>Stock and availability</b> \u2014 update from the portal or the winery app',
+          '<b>Cellar-door pickup</b>, gift messages, and pausing sales while you\u2019re away',
+        ]) +
+        `<div style="margin-top:14px"><button class="btn" data-go="settings">Open Store settings \u2192</button></div>`)}
+
+      ${q('How do I get paid?',
+        '<b>Monthly payment.</b> The customer pays AIWine at checkout. We deduct our commission and pay the balance to your nominated bank account in the <b>first week of the following month</b>, with a sales statement and remittance advice for your records.' +
+        '<div style="margin-top:10px;padding:12px 14px;background:var(--bg-alt);border-radius:8px;font-size:13.5px"><b>Coming:</b> direct payment via Stripe Connect \u2014 funds released to your account within a couple of working days of each sale rather than monthly (Stripe fees apply). We\u2019ll let you know when it\u2019s available.</div>')}
+
+      ${q('Why should I join?',
+        li([
+          'Get your wines in front of customers who are <b>actively looking for wine</b>',
+          'Our AI recommends your wines based on the flavour profiles each customer enjoys \u2014 grounded in <b>what you actually have in stock</b>',
+          'Your own Virtual Cellar Door, without having to build one',
+          'You stay in control of your wines, pricing and fulfilment',
+          'AIWine handles the customer payment and the order process',
+          '<b>You fulfil the order \u2014 we send you the sale</b>',
+          'Built specifically to help New Zealand wineries sell more wine directly to consumers',
+        ]))}
+
+      <div class="card card-pad" style="border-left:3px solid var(--claret)">
+        <div class="label" style="color:var(--brass);margin-bottom:8px">The simple proposition</div>
+        <div style="font-family:var(--serif);font-size:22px;line-height:1.35">List your wines for free.<br />Let AIWine find the customers.<br />You fulfil the orders.</div>
+      </div>
+
+      <div style="font-size:12.5px;color:var(--muted);margin-top:18px;line-height:1.6">
+        Full commercial terms are in the <a href="terms.html" target="_blank" style="color:var(--claret);font-weight:600">Winery Terms &amp; Conditions</a>. Questions? <b>Ask Vine</b> in the sidebar, or email <a href="mailto:hello@aiwine.co.nz" style="color:var(--claret)">hello@aiwine.co.nz</a>.
+      </div>`;
     bindGo(el);
   };
 
