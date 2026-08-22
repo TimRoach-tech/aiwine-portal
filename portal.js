@@ -186,8 +186,15 @@
             <span class="demo">${live?esc((PStore.wineryRegion?PStore.wineryName+' · '+PStore.wineryRegion:PStore.wineryName)||'Live'):'Demo · sample data'}</span>
           </div>
           <div class="actions">
-            ${live?`<span style="font-size:13px;color:var(--ink-soft)">${esc((PStore.userEmail&&PStore.userEmail.split('@')[0])||PStore.wineryName||'')}</span>
-            <button class="btn sm ghost" id="signout">Sign out</button>`:''}
+            ${live?`<div class="acct-wrap" style="position:relative">
+              <button class="btn sm ghost" id="acct-btn" aria-haspopup="true" aria-expanded="false">${esc((PStore.userEmail&&PStore.userEmail.split('@')[0])||PStore.wineryName||'Account')} ${ic('download',13)}</button>
+              <div class="acct-drop" id="acct-drop" role="menu">
+                <div class="acct-who">${esc(PStore.userEmail||'')}<span>${esc(PStore.wineryName||'')} · ${esc(PStore.myRole==='staff'?'Staff':'Owner')}</span></div>
+                <button class="acct-item" data-go="team" role="menuitem">${ic('passport',15)} Team &amp; access</button>
+                <button class="acct-item" data-go="settings" role="menuitem">${ic('settings',15)} Store settings</button>
+                <button class="acct-item danger" id="signout" role="menuitem">${ic('x',15)} Sign out</button>
+              </div>
+            </div>`:''}
           </div>
         </div>
         <div class="content" id="main" role="main" tabindex="-1">
@@ -204,6 +211,7 @@
           <div id="screen-plan" class="screen"></div>
           <div id="screen-app" class="screen"></div>
           <div id="screen-about" class="screen"></div>
+          <div id="screen-team" class="screen"></div>
         </div>
       </div>
       <div class="scrim" id="scrim"></div>
@@ -231,6 +239,14 @@
     $('#menu').addEventListener('click', ()=>{ const s=$('#side'); s.classList.toggle('open'); $('#scrim').classList.toggle('open', s.classList.contains('open')||$('#modal').classList.contains('open')); });
     $('#scrim').addEventListener('click', ()=>{ closeModal(); $('#side').classList.remove('open'); $('#scrim').classList.remove('open'); });
     const so=$('#signout'); if(so) so.addEventListener('click', async e=>{ e.preventDefault(); await PStore.signOut(); renderLogin(); });
+    // account dropdown (top right)
+    const ab=$('#acct-btn'), ad=$('#acct-drop');
+    if(ab && ad){
+      ab.addEventListener('click', e=>{ e.stopPropagation(); const open=ad.classList.toggle('open'); ab.setAttribute('aria-expanded', open?'true':'false'); });
+      document.addEventListener('click', ()=>{ ad.classList.remove('open'); ab.setAttribute('aria-expanded','false'); });
+      ad.addEventListener('click', e=>e.stopPropagation());
+      ad.querySelectorAll('[data-go]').forEach(b=>b.addEventListener('click',()=>{ ad.classList.remove('open'); go(b.dataset.go); }));
+    }
     const wb=$('#wb'), wm=$('#winery-menu');
     if(wb && wm){
       const togg=()=>{ wb.classList.toggle('open'); wm.classList.toggle('open'); };
@@ -1230,6 +1246,72 @@
       applyAll.disabled=false; applyAll.textContent=orig;
     });
     el.querySelector('#set-reset').addEventListener('click',()=>{ if(confirm('Reset store settings to defaults?')){ el._set=Object.assign({},SET_DEFAULTS); saveSet(el._set); rerender(); toast('Reset to defaults'); } });
+    bindGo(el);
+  };
+
+  RENDER.team = el => {
+    const owner = PStore.myRole === 'owner';
+    el.innerHTML = `
+      <div class="page-head"><div><div class="eyebrow">Team &amp; access</div>
+      <h1 class="page-title">Who can manage <em>${esc(PStore.wineryName||'your winery')}</em>.</h1>
+      <div class="sub-line">Everyone here can see your orders, wines and payout details. Add colleagues you trust.</div></div></div>
+      <div class="card"><div class="card-pad" id="team-list" style="color:var(--muted);font-size:13.5px">Loading…</div></div>
+      ${owner ? `
+      <div class="card card-pad" style="margin-top:14px">
+        <div class="card-title" style="margin-bottom:4px">Add someone</div>
+        <div style="font-size:13px;color:var(--ink-soft);margin-bottom:14px">We'll email them a link to set a password. If they already have an AIWine login, we'll just add this winery to it.</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-start">
+          <input id="inv-mail" type="email" placeholder="name@yourwinery.co.nz" style="flex:1;min-width:220px;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:var(--card-2);font-size:16px">
+          <select id="inv-role" style="padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:var(--card-2);font-size:14px">
+            <option value="owner">Owner — full access</option>
+            <option value="staff">Staff — can't add people</option>
+          </select>
+          <button class="btn primary" id="inv-go">Send invite</button>
+        </div>
+      </div>` : `
+      <div class="card card-pad" style="margin-top:14px;font-size:13.5px;color:var(--ink-soft)">
+        You have <b>staff</b> access, so you can work on wines and orders but can't add or remove people. Ask an owner if you need someone added.
+      </div>`}`;
+
+    const draw = async () => {
+      const box = el.querySelector('#team-list');
+      try {
+        const rows = await PStore.team();
+        box.innerHTML = rows.map(m => `
+          <div class="team-row">
+            <div class="team-av">${esc((m.email||'?').charAt(0).toUpperCase())}</div>
+            <div style="flex:1;min-width:0">
+              <div style="font-weight:600;font-size:14px;overflow:hidden;text-overflow:ellipsis">${esc(m.email)}${m.is_me?' <span style="color:var(--muted);font-weight:400">(you)</span>':''}</div>
+              <div style="font-family:var(--mono);font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-top:3px">${m.role==='staff'?'Staff':'Owner'}</div>
+            </div>
+            ${owner && !m.is_me ? `<button class="btn-quiet" data-rm="${esc(m.user_id)}" data-mail="${esc(m.email)}" aria-label="Remove ${esc(m.email)}">${ic('x',16)}</button>` : ''}
+          </div>`).join('');
+        box.querySelectorAll('[data-rm]').forEach(b => b.addEventListener('click', () => {
+          confirmModal({ title:'Remove access?', message:b.dataset.mail+' will immediately lose access to '+(PStore.wineryName||'this winery')+', including orders and payout details. Their AIWine login stays, but it won\u2019t reach your winery.', confirm:'Remove access', danger:true }, async () => {
+            try { await PStore.removeUser(b.dataset.rm); toast('Access removed'); draw(); }
+            catch(e){ toast(e.message); }
+          });
+        }));
+      } catch (e) {
+        box.innerHTML = '<span style="color:var(--red)">'+esc(e.message||'Couldn\u2019t load your team')+'</span>';
+      }
+    };
+    draw();
+
+    const go2 = el.querySelector('#inv-go');
+    if (go2) go2.addEventListener('click', async () => {
+      const mail = el.querySelector('#inv-mail').value.trim();
+      const role = el.querySelector('#inv-role').value;
+      if (!mail) return toast('Enter their email address');
+      go2.disabled = true; go2.textContent = 'Sending…';
+      try {
+        const r = await PStore.inviteUser(mail, role);
+        el.querySelector('#inv-mail').value = '';
+        toast(r.existing ? mail+' now has access' : 'Invite sent to '+mail);
+        draw();
+      } catch (e) { toast(e.message); }
+      go2.disabled = false; go2.textContent = 'Send invite';
+    });
     bindGo(el);
   };
 

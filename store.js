@@ -333,6 +333,62 @@
         if (data) w.id = data.id;
       }
     },
+    // ---- Team & access (migration 31) ----
+    // Reading the team is RLS-scoped; ADDING someone goes through the
+    // /api/invite-user endpoint, because granting access to a winery's orders and
+    // payouts is a privilege escalation and must not be a client-side insert.
+    get myRole() {
+      const w = wineries.find(x => x.id === wineryId);
+      return (w && w.role) || 'owner';
+    },
+    async team() {
+      if (!LIVE) return [{ user_id: 'demo', email: Store.userEmail || 'you@winery.co.nz', role: 'owner', is_me: true }];
+      const { data, error } = await sb.rpc('winery_team', { p_winery: wineryId });
+      if (error) throw new Error(error.message);
+      return data || [];
+    },
+    async inviteUser(email, role) {
+      if (!LIVE) throw new Error('Adding colleagues needs a live account.');
+      const r = await fetch('/api/invite-user', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + Store.accessToken() },
+        body: JSON.stringify({ wineryId, email, role: role || 'owner' }),
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok || !j.ok) {
+        const map = {
+          not_a_member: 'You’re not linked to this winery.',
+          not_an_owner: 'Only an owner can add people to this winery.',
+          invalid_email: 'That doesn’t look like a valid email address.',
+          sign_in_required: 'Please sign in again.',
+          server_not_configured: 'Invites aren’t switched on yet — contact AIWine.',
+        };
+        throw new Error(map[j.error] || j.detail || j.error || 'Couldn’t send the invite.');
+      }
+      return j;   // { invited, existing, email, role }
+    },
+    async removeUser(userId) {
+      if (!LIVE) throw new Error('demo');
+      const { error } = await sb.rpc('remove_winery_user', { p_winery: wineryId, p_user: userId });
+      if (error) {
+        const m = error.message || '';
+        if (/cannot_remove_yourself/.test(m)) throw new Error('You can’t remove your own access.');
+        if (/cannot_remove_last_owner/.test(m)) throw new Error('This is the only owner — add another owner first.');
+        if (/not_an_owner/.test(m)) throw new Error('Only an owner can remove people.');
+        throw new Error(m);
+      }
+    },
+    async setUserRole(userId, role) {
+      if (!LIVE) throw new Error('demo');
+      const { error } = await sb.rpc('set_winery_user_role', { p_winery: wineryId, p_user: userId, p_role: role });
+      if (error) {
+        const m = error.message || '';
+        if (/cannot_demote_last_owner/.test(m)) throw new Error('Add another owner before changing this one to staff.');
+        if (/not_an_owner/.test(m)) throw new Error('Only an owner can change roles.');
+        throw new Error(m);
+      }
+    },
+
     async removeWine(id) {
       Store.wines = Store.wines.filter(x => x.id !== id);
       if (LIVE) await sb.from('wines').delete().eq('id', id);

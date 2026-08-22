@@ -132,6 +132,18 @@ table.tbl{width:100%;border-collapse:collapse;}
 .bottle::after{content:"";position:absolute;left:50%;top:6px;transform:translateX(-50%);width:13px;height:16px;background:rgba(244,239,229,0.85);border-radius:1px;}
 .wine-nm{font-weight:600;font-size:13.5px;}
 .wine-edit:hover{color:var(--claret);text-decoration:underline;text-underline-offset:3px;}
+/* account dropdown (topbar) */
+.acct-drop{position:absolute;top:calc(100% + 8px);right:0;min-width:250px;background:var(--card);border:1px solid var(--line);border-radius:10px;box-shadow:0 12px 32px rgba(60,40,20,.16);padding:6px;opacity:0;visibility:hidden;transform:translateY(-4px);transition:opacity .14s,transform .14s,visibility .14s;z-index:60;}
+.acct-drop.open{opacity:1;visibility:visible;transform:translateY(0);}
+.acct-who{padding:11px 12px 10px;font-size:13px;font-weight:600;border-bottom:1px solid var(--line-soft);margin-bottom:5px;word-break:break-all;}
+.acct-who span{display:block;font-family:var(--mono);font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:400;margin-top:4px;}
+.acct-item{display:flex;align-items:center;gap:10px;width:100%;text-align:left;background:none;border:none;padding:10px 12px;border-radius:7px;font-family:var(--sans);font-size:13.5px;color:var(--ink);cursor:pointer;min-height:44px;}
+.acct-item:hover{background:var(--bone-alt);}
+.acct-item.danger{color:var(--claret);}
+/* team & access */
+.team-row{display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--line-soft);}
+.team-row:last-child{border-bottom:none;}
+.team-av{width:34px;height:34px;border-radius:50%;flex:none;background:var(--claret);color:#fff;display:flex;align-items:center;justify-content:center;font-family:var(--serif);font-size:16px;}
 .wine-meta{font-family:var(--mono);font-size:10px;letter-spacing:0.06em;color:var(--muted);text-transform:uppercase;margin-top:2px;}
 .stepper{display:inline-flex;align-items:center;border:1px solid var(--line);border-radius:7px;overflow:hidden;background:var(--card-2);}
 .stepper button{width:28px;height:30px;background:none;border:none;font-size:15px;color:var(--ink-soft);display:grid;place-items:center;}
