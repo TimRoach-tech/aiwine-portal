@@ -1487,7 +1487,22 @@
           const dx=Math.round((FW-dw)/2), dy=Math.round(FH-dh-FH*0.04);
           const out=document.createElement('canvas'); out.width=FW; out.height=FH;
           out.getContext('2d').drawImage(img, minX,minY,cw,ch, dx,dy,dw,dh);
-          out.toBlob(b=>{ cb({ dataUrl: out.toDataURL('image/png'), blob: b||file, transparent: hasAlpha }); }, 'image/png');
+          // PNG stays canonical (transparency + existing image_url), and we also
+          // emit WebP at three widths for srcset. WebP keeps alpha, so cut-out
+          // bottles render correctly, at roughly a third of the bytes.
+          out.toBlob(png=>{
+            const widths=[200,400,640], webp={};
+            let left=widths.length;
+            const done=()=>{ if(--left===0) cb({ dataUrl: out.toDataURL('image/png'), blob: png||file, png: png||file, webp, transparent: hasAlpha }); };
+            widths.forEach(wpx=>{
+              const c2=document.createElement('canvas');
+              c2.width=wpx; c2.height=Math.round(FH*(wpx/FW));
+              c2.getContext('2d').drawImage(out,0,0,c2.width,c2.height);
+              // If the browser can't encode WebP the blob is null; we simply ship
+              // fewer variants rather than failing the upload.
+              c2.toBlob(b=>{ if(b) webp[wpx]=b; done(); }, 'image/webp', 0.86);
+            });
+          }, 'image/png');
         }catch(e){ cb({ dataUrl:r.result, blob:file, transparent:true }); }
       }; img.onerror=()=>cb({ dataUrl:r.result, blob:file, transparent:true }); img.src=r.result; };
       r.readAsDataURL(file);
@@ -1498,7 +1513,7 @@
     const imgOf = w => LIVE ? (w.image||'') : (imgs[w.id]||'');
     single.addEventListener('change',e=>{ const f=e.target.files[0]; if(!f||!target){ single.value=''; target=null; return; } const t=target; single.value=''; target=null;
       prep(f, res=>{
-        if(LIVE){ PStore.uploadWineImage(t,res.blob).then(()=>{ WINES=PStore.wines; draw(); toast(res.transparent?'Photo uploaded — live on the site':'Photo uploaded'); }).catch(err=>{ toast('Upload failed: '+(err&&err.message||err)); }); }
+        if(LIVE){ PStore.uploadWineImage(t,{png:res.png||res.blob,webp:res.webp}).then(()=>{ WINES=PStore.wines; draw(); toast(res.transparent?'Photo uploaded — live on the site':'Photo uploaded'); }).catch(err=>{ toast('Upload failed: '+(err&&err.message||err)); }); }
         else { imgs[t]=res.dataUrl; if(save()){ draw(); toast('Photo added'); } else { delete imgs[t]; draw(); toast('Couldn’t save — photo too large for local storage.'); } }
       });
     });
@@ -1510,7 +1525,7 @@
         toast((ok?(matched+(LIVE?' uploaded':' matched')):'Couldn’t save all — storage full')+(un?' · '+un+' unmatched':'')+(opaque?' · '+opaque+' had a solid background (use cut-out PNGs)':'')+(LIVE&&ok?' — live on the site':'')); };
       arr.forEach(f=>{ const w=match(f); if(!w){ un++; finish(); return; }
         prep(f, res=>{ if(!res.transparent) opaque++;
-          if(LIVE){ PStore.uploadWineImage(w.id,res.blob).then(()=>{matched++;}).catch(()=>{un++;}).then(finish); }
+          if(LIVE){ PStore.uploadWineImage(w.id,{png:res.png||res.blob,webp:res.webp}).then(()=>{matched++;}).catch(()=>{un++;}).then(finish); }
           else { imgs[w.id]=res.dataUrl; matched++; finish(); }
         }); });
     }

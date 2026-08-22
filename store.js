@@ -397,16 +397,55 @@
     },
     // Upload a bottle photo to Supabase Storage and save its public URL on the
     // wine row. Returns the public URL. LIVE only (demo keeps localStorage).
-    async uploadWineImage(id, file) {
+    // Accepts either a single Blob (legacy) or { png, webp } where webp is a map
+    // of width -> Blob. The PNG stays the canonical image_url so existing wines
+    // and the transparent-bottle rendering are unaffected; WebP variants are
+    // additive and only referenced when they exist.
+    async uploadWineImage(id, input) {
       if (!LIVE) throw new Error('demo');
-      const ext = (file.type && file.type.split('/')[1] || 'jpg').replace('jpeg', 'jpg');
-      const path = `${wineryId}/${id}.${ext}`;
-      const up = await sb.storage.from('wine-images').upload(path, file, { upsert: true, contentType: file.type || 'image/jpeg' });
-      if (up.error) { if (window.AIWineReport) AIWineReport.error('image_upload_failed', up.error, { wineId: id, path }); throw new Error(up.error.message); }
-      const { data } = sb.storage.from('wine-images').getPublicUrl(path);
-      const url = data.publicUrl + '?t=' + Date.now();   // cache-bust on replace
-      await Store.updateWine(id, { image_url: url });
-      const w = Store.wines.find(x => x.id === id); if (w) w.image = url;
+      const single = (input instanceof Blob) ? input : null;
+      const png = single || (input && input.png);
+      if (!png) throw new Error('no image');
+
+      const put = async (path, blob, type) => {
+        const up = await sb.storage.from('wine-images').upload(path, blob, { upsert: true, contentType: type });
+        if (up.error) throw new Error(up.error.message);
+        const { data } = sb.storage.from('wine-images').getPublicUrl(path);
+        return data.publicUrl;
+      };
+
+      const ext = (png.type && png.type.split('/')[1] || 'png').replace('jpeg', 'jpg');
+      const bust = '?t=' + Date.now();
+      let url;
+      try {
+        url = (await put(`${wineryId}/${id}.${ext}`, png, png.type || 'image/png')) + bust;
+      } catch (e) {
+        if (window.AIWineReport) AIWineReport.error('image_upload_failed', e, { wineId: id });
+        throw e;
+      }
+
+      // Variants are best-effort: if one fails we still have a working PNG, and
+      // image_webp is only set when the 640 landed — so the site never builds a
+      // srcset pointing at a file that isn't there.
+      let webpUrl = null;
+      const webp = (input && input.webp) || null;
+      if (webp) {
+        try {
+          const widths = Object.keys(webp).map(Number).sort((a, b) => a - b);
+          const urls = {};
+          for (const wpx of widths) urls[wpx] = await put(`${wineryId}/${id}-${wpx}.webp`, webp[wpx], 'image/webp');
+          if (urls[640]) webpUrl = urls[640] + bust;
+        } catch (e) {
+          webpUrl = null;   // silently fall back to PNG-only; not worth failing the upload
+          if (window.AIWineReport) AIWineReport.warn('image_webp_partial', 'variant upload failed', { wineId: id });
+        }
+      }
+
+      const patch = { image_url: url };
+      if (webpUrl) patch.image_webp = webpUrl;
+      await Store.updateWine(id, patch);
+      const w = Store.wines.find(x => x.id === id);
+      if (w) { w.image = url; if (webpUrl) w.imageWebp = webpUrl; }
       return url;
     },
     async removeWineImage(id) {
