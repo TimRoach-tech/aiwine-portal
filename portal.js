@@ -819,13 +819,17 @@
         <div class="label" style="color:var(--brass);margin-bottom:8px">Virtual Cellar Door \u00b7 $95/yr</div>
         <div style="font-family:var(--serif);font-size:24px;margin-bottom:6px">Activate your virtual cellar door</div>
         <div style="font-size:13.5px;color:var(--ink-soft);max-width:560px;margin-bottom:18px">A rich profile \u2014 hero photo, your story, visit details and a \u201cCellar Door\u201d badge across AIWine. Self-managed, right here.</div>
+        <div style="padding:14px 16px;background:#f6efe6;border-left:3px solid var(--claret);border-radius:0 8px 8px 0;margin-bottom:16px">
+          <div style="font-weight:700;margin-bottom:4px">Founding member? Your first 12 months are free.</div>
+          <div style="font-size:13px;color:var(--ink-soft)">Enter code <b style="font-family:var(--mono)">FOUNDING26</b> in the box below — no card needed. Renews at $95/yr after the first year, cancel any time.</div>
+        </div>
         <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px">
           <button class="btn primary" data-pay="95">Subscribe \u00b7 $95/yr</button>
           <button class="btn" data-pay="49">Founding rate \u00b7 $49 first year</button>
         </div>
         <div style="display:flex;gap:8px;align-items:center;max-width:400px">
-          <input id="code" aria-label="Activation code" placeholder="Have an activation code?" style="flex:1;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:var(--card-2);font-size:14px">
-            <button class="btn" id="act-code">Apply</button>
+          <input id="code" aria-label="Activation code" placeholder="Enter FOUNDING26" style="flex:1;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:var(--card-2);font-size:16px;text-transform:uppercase">
+            <button class="btn primary" id="act-code">Apply code</button>
         </div>
         <div style="font-size:12px;color:var(--muted);margin-top:12px">Pay by card — secure Stripe checkout, activates immediately. No invoices, cancel anytime. GST receipt emailed. <a href="#" id="plan-refresh" style="color:var(--claret)">Just paid? Check activation</a></div>
       </div>`;
@@ -857,7 +861,7 @@
       </div>
       <div class="card card-pad" style="margin-top:20px;display:flex;align-items:center;gap:18px;flex-wrap:wrap">
         <div style="flex:1;min-width:240px"><div class="card-title" style="margin-bottom:4px">Grow \u2014 insights &amp; integrations</div>
-        <div style="font-size:13px;color:var(--ink-soft)">Scan insights, demand signals and API/EPOS sync. <b>$95/yr.</b></div></div>
+        <div style="font-size:13px;color:var(--ink-soft)">Unlocks <b>data insights</b> — regional and national scan demand, top sommelier asks, wine performance — plus API/EPOS sync. Also unlocks Insights in the winery app. <b>$95/yr.</b></div></div>
         ${hasGrow()?'<span class="pill in">Active</span>':'<button class="btn primary" id="grow-buy">Unlock Grow \u00b7 $95/yr</button>'}
       </div>`;
     if(!active){
@@ -887,8 +891,28 @@
       }
       el.querySelector('#cd-save').addEventListener('click',()=>{
         const story=el.querySelector('#cd-story').value, hours=el.querySelector('#cd-hours').value;
-        if(LIVE){ const b=el.querySelector('#cd-save'); b.disabled=true; b.textContent='Saving...'; PStore.saveCellar({story,hours}).then(()=>toast('Cellar door published - live on your profile')).catch(err=>toast('Could not save: '+(err&&err.message||err))).then(()=>{ b.disabled=false; b.textContent='Save - publish to my profile'; }); }
-        else { PLAN.story=story; PLAN.hours=hours; savePlan(); toast('Cellar door updated - live on your profile'); }
+        // GUARD (added after a blank save wiped a live cellar door): publishing an
+        // empty field over existing content is almost never intended, and the old
+        // code did it silently with no way back. Warn, name what will be lost,
+        // and require an explicit confirm.
+        const had = (CD.story||'').trim() || (CD.hours||'').trim();
+        const nowEmpty = !story.trim() && !hours.trim();
+        const clearing = [];
+        if((CD.story||'').trim() && !story.trim()) clearing.push('your story');
+        if((CD.hours||'').trim() && !hours.trim()) clearing.push('your visit hours');
+        const doSave = () => {
+          if(LIVE){ const b=el.querySelector('#cd-save'); b.disabled=true; b.textContent='Saving…'; PStore.saveCellar({story,hours}).then(()=>{ toast('Cellar door published — live on your profile'); go('cellar'); }).catch(e=>{ b.disabled=false; b.textContent='Save — publish to my profile'; toast(e&&e.message?e.message:'Couldn’t save'); if(window.AIWineReport) AIWineReport.error('cellar_save_failed', e); }); }
+          else { PLAN.story=story; PLAN.hours=hours; savePlan(); toast('Cellar door updated — live on your profile'); }
+        };
+        if(had && nowEmpty){
+          confirmModal({ title:'Publish an empty profile?', message:'Both fields are blank, so this will REMOVE '+clearing.join(' and ')+' from your public cellar door. Visitors will see an empty profile. This cannot be undone from here.', confirm:'Yes, clear it', cancel:'Keep what I have', danger:true }, doSave);
+          return;
+        }
+        if(clearing.length){
+          confirmModal({ title:'Remove '+clearing.join(' and ')+'?', message:'Saving now will clear '+clearing.join(' and ')+' from your public cellar door. Everything else stays as it is.', confirm:'Save anyway', cancel:'Go back', danger:true }, doSave);
+          return;
+        }
+        doSave();
       });
     }
     const gb=el.querySelector('#grow-buy'); if(gb) gb.addEventListener('click',()=>demoCheckout(95,'grow'));
