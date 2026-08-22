@@ -414,7 +414,7 @@
       <div class="page-head">
         <div><div class="eyebrow">Good morning</div><h1 class="page-title">Here's your <em>week</em>.</h1>
         <div class="sub-line">Everything customers are doing with your wines on AIWine.</div></div>
-        <button class="btn primary" data-go="upload">${ic('upload',15)} Update my list</button>
+        <button class="btn primary" id="dash-app">${ic('download',15)} Download Winery App</button>
       </div>
       ${firstRun}
       ${lowOut.length?`<div class="alert ${lowOut.some(w=>stkOf(w)==='out')?'out':'warn'}">
@@ -467,6 +467,7 @@
         </div>
       </div>`;
     const gsd=el.querySelector('#gs-dismiss'); if(gsd) gsd.addEventListener('click',()=>{ try{ localStorage.setItem(gsKey,'1'); }catch(e){} RENDER.dashboard(el); toast('Checklist hidden'); });
+    const da=el.querySelector('#dash-app'); if(da) da.addEventListener('click',()=>window.open(APP_URL,'_blank'));
     bindGo(el);
   };
 

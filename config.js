@@ -9,7 +9,7 @@ window.PORTAL_CONFIG = {
   APP_NAME: "AIWine Winery Portal",
   // Absolute URL to the winery phone app (the portal lives on its own
   // subdomain, so a relative path would 404 in production).
-  WINERY_APP_URL: "https://aiwine.co.nz/apps/winery/index.html",
+  WINERY_APP_URL: "https://winery.aiwine.co.nz",
   // Stripe Payment Links (create in Stripe → Payment Links, paste URLs here).
   // When set, the Plans page "Subscribe" buttons open Stripe card checkout;
   // while empty, buttons fall back to a register-interest email.
