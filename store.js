@@ -197,8 +197,7 @@
         Store.orders = DEMO_ORDERS.map(o => ({ ...o }));
         return { ok: true, demo: true };
       }
-      await loadLib();
-      sb = window.supabase.createClient(CFG.SUPABASE_URL, CFG.SUPABASE_ANON_KEY);
+      await getClient();
       const { data } = await sb.auth.getSession();
       session = data && data.session;
       if (!session) return { ok: false, needsAuth: true };
@@ -208,7 +207,7 @@
       return { ok: true };
     },
     async signUp(email, password) {
-      if (!sb) { await loadLib(); sb = window.supabase.createClient(CFG.SUPABASE_URL, CFG.SUPABASE_ANON_KEY); }
+      await getClient();
       // Send the confirmation link back to the PORTAL (Supabase's Site URL points
       // at the consumer site, so without this a winery would be bounced there).
       const redirectTo = (typeof window !== 'undefined' && window.location && window.location.origin) || undefined;
@@ -266,7 +265,7 @@
     // ---- password reset ----
     isRecovery() { return /type=recovery/.test(location.hash || ''); },
     async resetPassword(email) {
-      if (!sb) { await loadLib(); sb = window.supabase.createClient(CFG.SUPABASE_URL, CFG.SUPABASE_ANON_KEY); }
+      await getClient();
       const e = (email || '').trim().toLowerCase();
       if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e)) throw new Error('Enter the email for your winery login.');
       const { error } = await sb.auth.resetPasswordForEmail(e, { redirectTo: location.origin + location.pathname });
@@ -274,7 +273,7 @@
       return true;
     },
     async setNewPassword(pw) {
-      if (!sb) { await loadLib(); sb = window.supabase.createClient(CFG.SUPABASE_URL, CFG.SUPABASE_ANON_KEY); }
+      await getClient();
       // Policy: min 8 chars AND (letter+number OR length >= 12). Mirrors portal.js pwValid().
       const ok = (pw || '').length >= 8 && ((/[A-Za-z]/.test(pw) && /\d/.test(pw)) || (pw || '').length >= 12);
       if (!ok) throw new Error('Password must be at least 8 characters, with letters and a number (or 12+ characters).');
@@ -481,6 +480,19 @@
       postage: +r.postage || 0, commission: +r.commission || 0, wineryNet: +r.wineryNet || 0 };
   }
   function rel(ts) { if (!ts) return ''; const d = (Date.now() - new Date(ts)) / 86400000; return d < 1 ? 'today' : d < 2 ? 'yesterday' : Math.floor(d) + ' days ago'; }
+
+  // SINGLE Supabase client. Previously init() called createClient()
+  // unconditionally while three other paths were guarded by `if (!sb)`, so a
+  // second init() — or signUp/resetPassword before init — produced TWO clients
+  // sharing one storage key. That is what logged "Multiple GoTrueClient
+  // instances" and caused intermittent "Invalid Refresh Token": the two clients
+  // race for the same stored session and one wins. Always go through here.
+  async function getClient() {
+    if (sb) return sb;
+    await loadLib();
+    sb = window.supabase.createClient(CFG.SUPABASE_URL, CFG.SUPABASE_ANON_KEY);
+    return sb;
+  }
 
   async function loadWinery() {
     const { data: maps, error } = await sb.from('winery_users').select('"wineryId"');
