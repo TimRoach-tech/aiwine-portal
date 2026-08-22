@@ -311,6 +311,14 @@
         if (w) { w.updatedBy = db.updated_by; w.updatedAt = db.updated_at; }
         const { error } = await sb.from('wines').update(db).eq('id', id);
         if (error) { if (window.AIWineReport) AIWineReport.error('wine_save_failed', error, { wineId: id }); throw new Error(error.message); }
+        // If this write PUBLISHED a wine with no "why" yet, nudge the generator now
+        // instead of waiting up to 15 minutes for the cron. Fire-and-forget: a
+        // missing sommelier line is cosmetic, and must never fail a real save.
+        try {
+          if (db.published === true && w && !String(w.why || '').trim()) {
+            fetch('/api/generate-why?id=' + encodeURIComponent(id)).catch(() => {});
+          }
+        } catch (e) {}
       }
     },
     async addWine(w) {

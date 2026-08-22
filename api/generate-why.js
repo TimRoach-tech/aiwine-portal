@@ -23,7 +23,7 @@
 // ---------------------------------------------------------------------------
 
 const MODEL = 'claude-haiku-4-5-20251001';   // small, cheap, plenty for a one-liner
-const BATCH = 40;                          // wines per invocation (stay within limits)
+const BATCH = 200;                          // wines per invocation (stay within limits)
 const MAX_WORDS = 18;
 
 async function sb(path, { method = 'GET', body, query = '' } = {}) {
@@ -104,13 +104,25 @@ module.exports = async (req, res) => {
 
     const wines = await sb('wines', { query: filter });
     let done = 0, failed = 0;
-    for (const w of wines) {
-      if (!force && !q.id && w.why) continue;
-      try {
-        const why = await whyForWine(w);
-        if (why) { await sb('wines', { method: 'PATCH', query: `?id=eq.${w.id}`, body: { why } }); done++; }
-      } catch (e) { failed++; }
+    // CONCURRENCY POOL. The wall-clock cost here is model latency, not the loop,
+    // so running these one at a time was the throughput ceiling: 40 per run meant
+    // a 10,000-wine onboarding wave took ~62 hours with blank cards meanwhile.
+    // 8-wide keeps each run comfortably inside the serverless timeout while
+    // raising throughput roughly 8x. A single slow or failed call no longer
+    // stalls the whole batch.
+    const todo = wines.filter(w => force || q.id || !w.why);
+    const POOL = 8;
+    let cursor = 0;
+    async function worker() {
+      while (cursor < todo.length) {
+        const w = todo[cursor++];
+        try {
+          const why = await whyForWine(w);
+          if (why) { await sb('wines', { method: 'PATCH', query: `?id=eq.${w.id}`, body: { why } }); done++; }
+        } catch (e) { failed++; }
+      }
     }
+    await Promise.all(Array.from({ length: Math.min(POOL, todo.length) }, worker));
     res.status(200).json({ scanned: wines.length, written: done, failed, note: 'run again to continue if scanned === batch' });
   } catch (e) {
     res.status(500).json({ error: String(e.message || e) });
