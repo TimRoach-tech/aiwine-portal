@@ -499,7 +499,21 @@
       if (!sErr && sset) sset.forEach(s => { const w = wineries.find(x => x.id === s.id); if (w) Object.assign(w, s); });
     } catch (e) { /* columns not present yet — settings stay at defaults */ }
     let pick = null;
-    try { pick = localStorage.getItem(ACTIVE_KEY); } catch (e) {}
+    // 1) explicit handoff: the portal's "Download Winery App" button appends
+    //    ?w=<wineryId>, so launching from the portal lands on the winery you were
+    //    just looking at. This is the only place it is honoured, and only if the
+    //    login actually manages that winery — a URL cannot grant access.
+    try {
+      const u = new URLSearchParams(location.search).get('w');
+      if (u && wineries.some(x => x.id === u)) {
+        pick = u;
+        try { localStorage.setItem(ACTIVE_KEY, u); } catch (e) {}
+      }
+    } catch (e) {}
+    // 2) otherwise this surface's own remembered choice. Deliberately NOT shared
+    //    live with the portal: a phone switching winery must not yank a desktop
+    //    mid-edit. See the note in apps/winery/winery.js switchWinerySheet().
+    if (!pick) { try { pick = localStorage.getItem(ACTIVE_KEY); } catch (e) {} }
     const active = wineries.find(x => x.id === pick) || wineries[0];
     wineryId = active.id; wineryName = active.name; wineryRegion = active.region || '';
   }

@@ -467,7 +467,7 @@
         </div>
       </div>`;
     const gsd=el.querySelector('#gs-dismiss'); if(gsd) gsd.addEventListener('click',()=>{ try{ localStorage.setItem(gsKey,'1'); }catch(e){} RENDER.dashboard(el); toast('Checklist hidden'); });
-    const da=el.querySelector('#dash-app'); if(da) da.addEventListener('click',()=>window.open(APP_URL,'_blank'));
+    const da=el.querySelector('#dash-app'); if(da) da.addEventListener('click',()=>window.open(APP_URL + (PStore.wineryId ? (APP_URL.indexOf('?')<0?'?':'&') + 'w=' + encodeURIComponent(PStore.wineryId) : ''),'_blank'));
     bindGo(el);
   };
 
@@ -1029,7 +1029,7 @@
         <div class="label" style="margin-bottom:10px">How to install</div>
         <div style="font-size:13.5px;color:var(--ink-soft);line-height:1.7"><b>1.</b> Tap <b>Download the winery app</b> above (open it on your phone).<br><b>2.</b> Choose <b>Add to Home Screen</b> — iPhone: Share then “Add to Home Screen”. Android: menu ⋮ then “Install app”.<br><b>3.</b> Open it from your home screen and sign in with your portal login.</div>
       </div>`;
-    const o=el.querySelector('#app-open'); if(o) o.addEventListener('click',()=>window.open(APP_URL,'_blank'));
+    const o=el.querySelector('#app-open'); if(o) o.addEventListener('click',()=>window.open(APP_URL + (PStore.wineryId ? (APP_URL.indexOf('?')<0?'?':'&') + 'w=' + encodeURIComponent(PStore.wineryId) : ''),'_blank'));
   };
 
   RENDER.insights = el => {
@@ -1429,7 +1429,7 @@
         <button class="btn primary" id="open-app">${ic('sparkle',15)} Get the winery app</button>
       </div>`;
     el.querySelectorAll('[data-go]').forEach(b=>b.addEventListener('click',()=>go(b.dataset.go)));
-    el.querySelector('#open-app').addEventListener('click',()=>window.open(APP_URL,'_blank'));
+    el.querySelector('#open-app').addEventListener('click',()=>window.open(APP_URL + (PStore.wineryId ? (APP_URL.indexOf('?')<0?'?':'&') + 'w=' + encodeURIComponent(PStore.wineryId) : ''),'_blank'));
   };
   function intCard(icon,title,status,pill,body,cta,goId,href){
     const action = href?`<a class="btn" href="${href}" style="justify-content:center">${cta} ↗</a>`:`<button class="btn ${goId==='wines'||goId==='upload'?'primary':''}" data-go="${goId}" style="justify-content:center">${cta}</button>`;
