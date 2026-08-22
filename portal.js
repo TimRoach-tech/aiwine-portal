@@ -1268,6 +1268,7 @@
           </select>
           <button class="btn primary" id="inv-go">Send invite</button>
         </div>
+        <div id="inv-result" style="display:none;margin-top:14px;padding:13px 15px;border-radius:8px;font-size:13.5px;line-height:1.6"></div>
       </div>` : `
       <div class="card card-pad" style="margin-top:14px;font-size:13.5px;color:var(--ink-soft)">
         You have <b>staff</b> access, so you can work on wines and orders but can't add or remove people. Ask an owner if you need someone added.
@@ -1302,14 +1303,34 @@
     if (go2) go2.addEventListener('click', async () => {
       const mail = el.querySelector('#inv-mail').value.trim();
       const role = el.querySelector('#inv-role').value;
-      if (!mail) return toast('Enter their email address');
+      const out = el.querySelector('#inv-result');
+      const show = (ok, html) => {
+        // Persistent, not a toast: this tells the owner whether someone can now
+        // reach their orders and payouts, and whether an email is on its way.
+        // A 2-second toast is the wrong medium for that.
+        out.style.display = 'block';
+        out.style.background = ok ? '#f1f7f1' : '#fbf0ee';
+        out.style.borderLeft = '3px solid ' + (ok ? 'var(--green,#3F6B4B)' : 'var(--claret)');
+        out.innerHTML = html;
+      };
+      if (!mail) return show(false, '<b>Enter their email address</b><div>We need an email to send the invite to.</div>');
       go2.disabled = true; go2.textContent = 'Sending…';
+      out.style.display = 'none';
       try {
         const r = await PStore.inviteUser(mail, role);
         el.querySelector('#inv-mail').value = '';
-        toast(r.existing ? mail+' now has access' : 'Invite sent to '+mail);
+        const roleWord = role === 'staff' ? 'Staff' : 'Owner';
+        if (r.existing) {
+          show(true, '<b>' + esc(mail) + ' can now manage ' + esc(PStore.wineryName || 'this winery') + '.</b>' +
+            '<div>They already had an AIWine login, so we’ve added this winery to it as <b>' + roleWord + '</b> — no email needed. Next time they sign in they’ll see your wines and orders.</div>');
+        } else {
+          show(true, '<b>Invite emailed to ' + esc(mail) + '.</b>' +
+            '<div>They’ll get a link to set a password, and will join as <b>' + roleWord + '</b>. They won’t appear in the list above until they accept it — that’s normal. If it doesn’t arrive, ask them to check spam.</div>');
+        }
         draw();
-      } catch (e) { toast(e.message); }
+      } catch (e) {
+        show(false, '<b>Couldn’t add ' + esc(mail) + '</b><div>' + esc(e.message || 'Something went wrong.') + '</div>');
+      }
       go2.disabled = false; go2.textContent = 'Send invite';
     });
     bindGo(el);

@@ -357,11 +357,14 @@
       const j = await r.json().catch(() => ({}));
       if (!r.ok || !j.ok) {
         const map = {
-          not_a_member: 'You’re not linked to this winery.',
-          not_an_owner: 'Only an owner can add people to this winery.',
-          invalid_email: 'That doesn’t look like a valid email address.',
-          sign_in_required: 'Please sign in again.',
-          server_not_configured: 'Invites aren’t switched on yet — contact AIWine.',
+          not_a_member: 'You’re not linked to this winery, so you can’t add people to it. Try switching winery in the top-left, or ask AIWine.',
+          not_an_owner: 'You have staff access. Only an owner of this winery can add or remove people.',
+          invalid_email: 'That doesn’t look like a valid email address — check for typos.',
+          sign_in_required: 'Your session has expired. Please sign out and back in, then try again.',
+          bad_session: 'Your session has expired. Please sign out and back in, then try again.',
+          server_not_configured: 'Invites aren’t switched on yet — contact AIWine and we’ll enable them.',
+          invite_failed: 'Supabase wouldn’t send the invite. The address may already be invited but not yet accepted.',
+          origin_not_allowed: 'Invites can only be sent from the AIWine portal.',
         };
         throw new Error(map[j.error] || j.detail || j.error || 'Couldn’t send the invite.');
       }
