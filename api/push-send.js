@@ -105,7 +105,21 @@ module.exports = async (req, res) => {
       const memQ = await fetch(`${sbUrl}/rest/v1/winery_users?select=role&userId=eq.${encodeURIComponent(u.id)}&wineryId=eq.${encodeURIComponent(wineryId)}`,
         { headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}` } });
       const mem = memQ.ok ? await memQ.json() : [];
-      if (!mem.length) return res.status(403).json({ error: 'not_a_member' });
+      if (!mem.length) {
+        // AIWine staff are not in winery_users for a winery they don't own, but
+        // they must be able to send a diagnostic push while supporting one — so
+        // fall back to the staff check rather than refusing outright.
+        let staff = false;
+        try {
+          const sQ = await fetch(`${sbUrl}/rest/v1/rpc/is_staff`, {
+            method: 'POST',
+            headers: { apikey: sbKey, Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+            body: '{}',
+          });
+          if (sQ.ok) staff = (await sQ.json()) === true;
+        } catch (e) {}
+        if (!staff) return res.status(403).json({ error: 'not_a_member' });
+      }
       authorised = true;
     }
 
