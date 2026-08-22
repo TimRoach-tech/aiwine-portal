@@ -131,7 +131,19 @@
       const w = wineries.find(x => x.id === wineryId) || {};
       return { story: w.cellar_story || '', hours: w.cellar_hours || '', image: w.cellar_image || '' };
     },
-    async saveCellar(data) {
+    async saveCellar(data, opts) {
+      // GUARD (added after an empty publish wiped a live cellar door): refuse to
+      // replace existing copy with nothing unless the caller explicitly says to.
+      // The editor's confirm dialog compares against cellarInfo, which is empty
+      // if the winery row hasn't hydrated yet — so the UI cannot be the only
+      // safeguard. Pass { allowClear: true } to deliberately clear a field.
+      const current = Store.cellarInfo;
+      const clearingStory = !String(data.story || '').trim() && !!String(current.story || '').trim();
+      const clearingHours = !String(data.hours || '').trim() && !!String(current.hours || '').trim();
+      if (!(opts && opts.allowClear) && (clearingStory || clearingHours)) {
+        const what = [clearingStory && 'story', clearingHours && 'hours'].filter(Boolean).join(' and ');
+        throw new Error('Refused to clear your cellar-door ' + what + '. Nothing was changed.');
+      }
       const patch = { cellar_story: data.story || null, cellar_hours: data.hours || null };
       if (data.image !== undefined) patch.cellar_image = data.image || null;
       const { data: rows, error } = await sb.from('wineries').update(patch).eq('id', wineryId).select('id');
@@ -147,7 +159,7 @@
       if (up.error) throw new Error(up.error.message);
       const { data } = sb.storage.from('wine-images').getPublicUrl(path);
       const url = data.publicUrl + '?t=' + Date.now();
-      await Store.saveCellar(Object.assign({}, Store.cellarInfo, { image: url }));
+      await Store.saveCellar(Object.assign({}, Store.cellarInfo, { image: url }), { allowClear: true });
       return url;
     },
     // redeem an activation code for the ACTIVE winery → returns the feature it unlocked

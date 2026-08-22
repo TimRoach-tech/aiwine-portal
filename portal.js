@@ -901,7 +901,7 @@
         if((CD.story||'').trim() && !story.trim()) clearing.push('your story');
         if((CD.hours||'').trim() && !hours.trim()) clearing.push('your visit hours');
         const doSave = () => {
-          if(LIVE){ const b=el.querySelector('#cd-save'); b.disabled=true; b.textContent='Saving…'; PStore.saveCellar({story,hours}).then(()=>{ toast('Cellar door published — live on your profile'); go('cellar'); }).catch(e=>{ b.disabled=false; b.textContent='Save — publish to my profile'; toast(e&&e.message?e.message:'Couldn’t save'); if(window.AIWineReport) AIWineReport.error('cellar_save_failed', e); }); }
+          if(LIVE){ const b=el.querySelector('#cd-save'); b.disabled=true; b.textContent='Saving…'; PStore.saveCellar({story,hours},{allowClear:true}).then(()=>{ toast('Cellar door published — live on your profile'); go('plan'); }).catch(e=>{ b.disabled=false; b.textContent='Save — publish to my profile'; toast(e&&e.message?e.message:'Couldn’t save'); if(window.AIWineReport) AIWineReport.error('cellar_save_failed', e); }); }
           else { PLAN.story=story; PLAN.hours=hours; savePlan(); toast('Cellar door updated — live on your profile'); }
         };
         if(had && nowEmpty){
