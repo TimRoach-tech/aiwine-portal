@@ -163,6 +163,18 @@ module.exports = async function handler(req, res) {
     const orderIds = await rpc.json();
     if (event.id) await finish(event.id, 'processed', { session_id: s.id });
     console.log('stripe-webhook: recorded order(s)', orderIds, 'for session', s.id);
+    // Notify each winery's devices. Fire-and-forget on purpose: a push failure
+    // must NEVER fail a paid order — the order is already written and Stripe
+    // would otherwise retry a transaction that succeeded.
+    try {
+      const wineryIds = [...new Set((orderObj.shipments || []).map(sh => sh.wineryId).filter(Boolean))];
+      const base = process.env.PUSH_SELF_URL || 'https://portal.aiwine.co.nz';
+      await Promise.all(wineryIds.map(wid => fetch(`${base}/api/push-send`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-internal-key': process.env.PUSH_INTERNAL_KEY || '' },
+        body: JSON.stringify({ wineryId: wid, kind: 'new_order' }),
+      }).catch(() => {})));
+    } catch (e) { console.warn('stripe-webhook: push notify skipped', e && e.message); }
     res.status(200).json({ received: true, orders: orderIds });
     return;
   }
